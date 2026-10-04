@@ -13,7 +13,8 @@
     "intro:plate": "node scripts/build-intro-plate.mjs",
     "typegen": "next typegen",
     "icons": "node scripts/build-icons.mjs",
-    "db:test": "bash scripts/db-test/run.sh"
+    "db:test": "bash scripts/db-test/run.sh",
+    "prebuild": "node -e \"require('fs').rmSync('.next/cache/turbopack',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

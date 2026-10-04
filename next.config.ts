@@ -49,6 +49,12 @@ const nextConfig: NextConfig = {
     qualities: [75, 90],
     formats: ["image/avif", "image/webp"],
   },
+  experimental: {
+    // Turbopack's build cache (.next/cache/turbopack, on by default since 16.3) stores a snapshot
+    // of the build environment, secret env values included. Netlify keeps that folder between
+    // builds and its secret scanner fails the deploy when it finds them, so don't write it.
+    turbopackFileSystemCacheForBuild: false,
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
