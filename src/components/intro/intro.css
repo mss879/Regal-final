@@ -1,0 +1,856 @@
+/* ==========================================================================
+   Home-page intro overlay (HomeIntro.tsx)
+   Sri Lanka -> Colombo and Kandy -> the expressway -> the hero.
+
+   The inline script in HomeIntro.tsx sets data-state="play" before first paint when the
+   intro should run, data-go once the title's font is in (that starts the clock), then
+   data-state="exit" and "done". Without data-state the overlay stays display:none.
+
+   Everything that moves animates transform or opacity only, so it runs on the compositor
+   while React hydrates and GSAP sets up. Layers are laid out at their final size and start
+   scaled down, never the other way round, so nothing ends up as an enlarged bitmap.
+
+   Next keeps this stylesheet loaded on other routes once the home page has been visited, so
+   every selector and keyframe name starts with "intro-" or hangs off #rvl-intro.
+   ========================================================================== */
+
+#rvl-intro {
+  --vw: 1vw;
+  --vh: 1vh;
+
+  /* Timeline: seconds after data-go */
+  --t-push: 0.9s; /* camera starts pushing in on the corridor */
+  --d-push: 0.75s;
+  --t-colombo: 1.3s;
+  --t-kandy: 1.45s;
+  --t-route: 1.65s; /* the line leaves Colombo */
+  --d-route: 0.75s;
+  --t-pulse: 2.34s; /* it reaches Kandy */
+  --t-dive: 2.45s; /* through the Kandy pin, onto the expressway */
+  --d-dive: 0.42s;
+  --t-road: 2.35s; /* the expressway starts moving, still hidden under the map */
+  --t-end: 3.55s; /* earliest moment the overlay may dissolve: the expressway gets under a second */
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.2, 1);
+
+  /* Map, landscape layout. Sizes are in viewport heights so the zoom factor is a constant. */
+  --u: calc(var(--vh) * 0.376); /* px per map unit once the camera has pushed in */
+  --z: 4.8; /* how far it pushes in */
+  --u1: calc(var(--u) / var(--z)); /* px per map unit in the opening view */
+  /* Where the corridor sits in the opening view, from the centre of the screen: this puts
+     the island's centre at 67% across, 50% down. */
+  --t0x: calc(var(--vw) * 17 - var(--vh) * 10.44);
+  --t0y: calc(var(--vh) * 15.4);
+  --title: min(calc(var(--vw) * 6.2), calc(var(--vh) * 12.5));
+  --label: calc(var(--vh) * 7.2);
+  --pin: max(9px, calc(var(--label) * 0.2));
+  --line: max(2.5px, calc(var(--label) * 0.07));
+  --head: calc(var(--label) * 0.95);
+
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  overflow: hidden;
+  background: #12231a;
+  color: #faf7f1;
+  font-family: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@supports (height: 1svh) {
+  #rvl-intro {
+    --vh: 1svh;
+  }
+}
+
+#rvl-intro[data-state="play"],
+#rvl-intro[data-state="exit"] {
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Map
+   Two layers that stay registered through the push-in, so it is sharp at both ends without
+   one huge texture: A is the whole island at its opening size, B is the final frame (the
+   corridor at full zoom, clipped to the screen). With the same timing, A moving to
+   translate(-z * t0) scale(z) and B coming from translate(t0) scale(1/z) match at every
+   instant; B fades in over A on the way.
+   -------------------------------------------------------------------------- */
+.intro-map {
+  position: absolute;
+  inset: 0;
+  background: #12231a;
+  /* the dive goes through the Kandy pin */
+  transform-origin: calc(50% + var(--u) * var(--kdx)) calc(50% + var(--u) * var(--kdy));
+}
+#rvl-intro[data-go] .intro-map {
+  animation: intro-dive var(--d-dive) cubic-bezier(0.6, 0, 0.9, 0.4) var(--t-dive) both;
+}
+@keyframes intro-dive {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(4.5);
+    opacity: 0;
+  }
+}
+
+.intro-map-a,
+.intro-map-b {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+/* B's sea is a rect inside its SVG rather than a background here: the compositor clips B's
+   contents a pixel short of a background's antialiased edge, which showed as a faint frame. */
+.intro-map-b {
+  overflow: hidden;
+  opacity: 0;
+}
+.intro-sea {
+  fill: #12231a;
+  stroke: none;
+}
+#rvl-intro[data-go] .intro-map-a {
+  animation:
+    intro-cam-a var(--d-push) var(--ease-in-out) var(--t-push) both,
+    intro-fade-out calc(var(--d-push) * 0.3) linear calc(var(--t-push) + var(--d-push) * 0.7) both;
+}
+#rvl-intro[data-go] .intro-map-b {
+  animation:
+    intro-cam-b var(--d-push) var(--ease-in-out) var(--t-push) both,
+    intro-fade-in calc(var(--d-push) * 0.4) linear calc(var(--t-push) + var(--d-push) * 0.1) both;
+}
+@keyframes intro-cam-a {
+  from {
+    transform: translate(0px, 0px) scale(1);
+  }
+  to {
+    transform: translate(calc(var(--t0x) * var(--z) * -1), calc(var(--t0y) * var(--z) * -1)) scale(var(--z));
+  }
+}
+@keyframes intro-cam-b {
+  from {
+    transform: translate(var(--t0x), var(--t0y)) scale(calc(1 / var(--z)));
+  }
+  to {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+@keyframes intro-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes intro-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.intro-island {
+  position: absolute;
+  display: block;
+  overflow: visible;
+  fill: #1e3a2a;
+  stroke: rgba(168, 183, 161, 0.8);
+  stroke-linejoin: round;
+}
+.intro-island path {
+  vector-effect: non-scaling-stroke;
+}
+.intro-map-a .intro-island {
+  left: calc(50% + var(--t0x) + var(--u1) * var(--ix));
+  top: calc(50% + var(--t0y) + var(--u1) * var(--iy));
+  width: calc(var(--u1) * var(--iw));
+  height: calc(var(--u1) * var(--ih));
+  stroke-width: 1px;
+  opacity: 0;
+}
+.intro-map-b .intro-island {
+  left: calc(50% + var(--u) * var(--ix));
+  top: calc(50% + var(--u) * var(--iy));
+  width: calc(var(--u) * var(--iw));
+  height: calc(var(--u) * var(--ih));
+  stroke-width: 1.4px;
+}
+/* The island is on screen from the first frame; the rest waits for data-go. */
+#rvl-intro[data-state] .intro-map-a .intro-island {
+  animation: intro-island-in 0.9s var(--ease-out) both;
+}
+@keyframes intro-island-in {
+  from {
+    opacity: 0;
+    transform: scale(0.955);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Title */
+.intro-title {
+  position: absolute;
+  left: calc(var(--vw) * 7);
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+  font-size: var(--title);
+  font-weight: 300;
+  line-height: 0.88;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.intro-title-out {
+  display: block;
+}
+/* One row; each word rises out of its own mask. */
+.intro-title-line {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  /* room for the glyphs' overshoot inside the mask */
+  margin: -0.06em -0.05em;
+  padding: 0.06em 0.05em;
+}
+.intro-title-line + .intro-title-line {
+  margin-left: 0.06em;
+}
+.intro-title-line > span {
+  display: block;
+  transform: translateY(112%);
+}
+#rvl-intro[data-go] .intro-title-line > span {
+  animation: intro-line-up 0.9s var(--ease-out) both;
+}
+#rvl-intro[data-go] .intro-title-line + .intro-title-line > span {
+  animation-delay: 0.09s;
+}
+@keyframes intro-line-up {
+  from {
+    transform: translateY(112%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+#rvl-intro[data-go] .intro-title-out {
+  animation: intro-title-out 0.42s cubic-bezier(0.5, 0, 0.75, 0) var(--t-push) both;
+}
+@keyframes intro-title-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.16em);
+  }
+}
+
+/* Route: a wipe made of two opposite slides (the outer box slides in, the inner one slides
+   back by the same amount), so the line itself never moves and nothing but transform animates. */
+.intro-route,
+.intro-head-carrier {
+  position: absolute;
+  left: calc(50% + var(--u) * var(--rx));
+  top: calc(50% + var(--u) * var(--ry));
+  width: calc(var(--u) * var(--rw));
+  height: calc(var(--u) * var(--rh));
+}
+.intro-route {
+  overflow: hidden;
+  transform: translateX(-100%);
+}
+.intro-route-in {
+  width: 100%;
+  height: 100%;
+  transform: translateX(100%);
+}
+.intro-route svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: #c5dc9f;
+  stroke-width: var(--line);
+  stroke-linecap: round;
+}
+.intro-route path {
+  vector-effect: non-scaling-stroke;
+}
+#rvl-intro[data-go] .intro-route {
+  animation: intro-wipe-out var(--d-route) var(--intro-route-ease) var(--t-route) both;
+}
+#rvl-intro[data-go] .intro-route-in {
+  animation: intro-wipe-in var(--d-route) var(--intro-route-ease) var(--t-route) both;
+}
+@keyframes intro-wipe-out {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}
+@keyframes intro-wipe-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}
+
+/* The head rides the wipe's leading edge on keyframes baked by scripts/build-intro-map.mjs
+   (intro-route.css): percentages of this box, with the wipe's easing already in them. */
+.intro-head-carrier {
+  opacity: 0;
+}
+.intro-head {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--head);
+  height: var(--head);
+  margin: calc(var(--head) / -2) 0 0 calc(var(--head) / -2);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0%,
+    #fff 13%,
+    rgba(214, 236, 172, 0.95) 23%,
+    rgba(197, 220, 159, 0.34) 45%,
+    rgba(197, 220, 159, 0) 70%
+  );
+}
+#rvl-intro[data-go] .intro-head-carrier {
+  animation:
+    intro-head-travel var(--d-route) linear var(--t-route) both,
+    intro-head-life calc(var(--d-route) + 0.3s) linear var(--t-route) both;
+}
+@keyframes intro-head-life {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Pins and labels: Colombo and Kandy, the only two places the intro names. */
+.intro-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.intro-pin-colombo {
+  left: calc(50% + var(--u) * var(--cdx));
+  top: calc(50% + var(--u) * var(--cdy));
+}
+.intro-pin-kandy {
+  left: calc(50% + var(--u) * var(--kdx));
+  top: calc(50% + var(--u) * var(--kdy));
+}
+.intro-pin-dot {
+  position: absolute;
+  left: calc(var(--pin) / -2);
+  top: calc(var(--pin) / -2);
+  width: var(--pin);
+  height: var(--pin);
+  border-radius: 50%;
+  background: #c5dc9f;
+  box-shadow: 0 0 0 calc(var(--pin) * 0.5) rgba(197, 220, 159, 0.22);
+  transform: scale(0);
+}
+#rvl-intro[data-go] .intro-pin-colombo .intro-pin-dot {
+  animation: intro-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) var(--t-colombo) both;
+}
+#rvl-intro[data-go] .intro-pin-kandy .intro-pin-dot {
+  animation: intro-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) var(--t-kandy) both;
+}
+@keyframes intro-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.intro-ring {
+  position: absolute;
+  left: calc(var(--pin) * -1);
+  top: calc(var(--pin) * -1);
+  width: calc(var(--pin) * 2);
+  height: calc(var(--pin) * 2);
+  border: 1.5px solid #c5dc9f;
+  border-radius: 50%;
+  opacity: 0;
+}
+#rvl-intro[data-go] .intro-ring {
+  animation: intro-ring 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) var(--t-pulse) forwards;
+}
+#rvl-intro[data-go] .intro-ring-2 {
+  animation-delay: calc(var(--t-pulse) + 0.14s);
+}
+@keyframes intro-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.6);
+  }
+}
+
+.intro-label {
+  position: absolute;
+  margin: 0;
+  font-size: var(--label);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+}
+/* Each label sits below its pin, pulled in from the screen edge when the pin is close to it. */
+.intro-label-colombo {
+  left: max(calc(var(--vw) * 4), calc(50% + var(--u) * var(--cdx) - var(--label) * 2.3));
+  top: calc(50% + var(--u) * var(--cdy) + var(--label) * 0.45);
+}
+.intro-label-kandy {
+  right: max(calc(var(--vw) * 4), calc(50% - var(--u) * var(--kdx) - var(--label) * 1.75));
+  top: calc(50% + var(--u) * var(--kdy) + var(--label) * 0.45);
+}
+#rvl-intro[data-go] .intro-label-colombo {
+  animation: intro-rise 0.55s var(--ease-out) calc(var(--t-colombo) + 0.05s) both;
+}
+#rvl-intro[data-go] .intro-label-kandy {
+  animation: intro-rise 0.55s var(--ease-out) calc(var(--t-kandy) + 0.05s) both;
+}
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Expressway
+   A photograph (the plate) with the lane dashes and the sign moving over it. Everything
+   hangs off a zero-size anchor at the photograph's vanishing point and is sized in plate
+   widths, so a scale() on the anchor is a push-in along the road.
+
+   --l-* / --p-* come from HomeIntro.tsx, measured from the landscape / portrait photograph:
+   pa  plate height / width            px, py  vanishing point, fraction of the plate
+   mid lane line's sideways offset     period, dash  dash spacing and width
+       (the last three in camera heights)
+   -------------------------------------------------------------------------- */
+.intro-hwy {
+  --pa: var(--l-pa);
+  --px: var(--l-px);
+  --py: var(--l-py);
+  --mid: var(--l-mid);
+  --period: var(--l-period);
+  --dash: var(--l-dash);
+
+  /* Plate width: big enough to cover the screen from the anchor below, at the smallest
+     scale the arrival uses (0.93). */
+  --pw: max(calc(var(--vw) * 115), calc(var(--vh) * 198));
+  /* Vanishing point on screen: right of centre, which leaves the left for the sign. */
+  --vx: calc(var(--vw) * 58);
+  --vy: calc(var(--vh) * 42);
+  /* Camera: --h is the drop from the vanishing point to the near edge of the ground plane,
+     kept below the bottom of the screen so nothing on the ground is drawn enlarged. */
+  --h: calc(var(--pw) * 0.31);
+  --f: calc(var(--pw) * 0.8);
+  /* Sign: width, gap between it and the vanishing point, height of its lower edge above the
+     horizon, and how far its posts reach below that edge. */
+  --sw: min(calc(var(--pw) * 0.25), calc(var(--vw) * 42));
+  --sr: min(calc(var(--pw) * 0.122), calc(var(--vw) * 13));
+  --sb: calc(var(--pw) * 0.03);
+  --sp: calc(var(--pw) * 0.05);
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #a9c3d6;
+}
+
+.intro-hwy-anchor,
+.intro-hwy-exit,
+.intro-hwy-arrive,
+.intro-hwy-cruise,
+.intro-eye,
+.intro-sign-rig,
+.intro-sign-exit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+.intro-hwy-anchor {
+  left: var(--vx);
+  top: var(--vy);
+}
+/* Arrival settles quickly; the cruise keeps creeping so nothing freezes if the exit waits. */
+#rvl-intro[data-go] .intro-hwy-arrive {
+  animation: intro-arrive 1.1s var(--ease-out) var(--t-road) both;
+}
+#rvl-intro[data-go] .intro-hwy-cruise {
+  animation: intro-cruise 6s linear var(--t-road) both;
+}
+@keyframes intro-arrive {
+  from {
+    transform: scale(0.93);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes intro-cruise {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.14);
+  }
+}
+
+/* The photograph, and the drawn backdrop that stands in for it until it has loaded. */
+.intro-plate,
+.intro-back {
+  position: absolute;
+  left: calc(var(--pw) * var(--px) * -1);
+  top: calc(var(--pw) * var(--pa) * var(--py) * -1);
+  width: var(--pw);
+  height: calc(var(--pw) * var(--pa));
+  max-width: none;
+}
+.intro-back-p {
+  display: none;
+}
+.intro-plate {
+  opacity: 0;
+  transition: opacity 0.35s linear;
+}
+#rvl-intro[data-plate] .intro-plate {
+  opacity: 1;
+}
+
+/* Lane dashes: a strip lying on a ground plane in real perspective. The strip carries one
+   dash per period and slides exactly one period, so the loop is seamless. It is laid out at
+   a tenth of its size and scaled up, which keeps the layer small. */
+.intro-eye {
+  perspective: var(--f);
+  perspective-origin: 0 0;
+}
+.intro-ground {
+  position: absolute;
+  left: calc(var(--h) * -0.06);
+  bottom: 0;
+  width: calc(var(--h) * 0.12);
+  height: calc(var(--f) * 2.4);
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  transform: translateY(var(--h)) rotateX(90deg) scale(10);
+  /* dashes thin out toward the horizon instead of shimmering */
+  -webkit-mask-image: linear-gradient(to top, #000 10%, rgba(0, 0, 0, 0) 60%);
+  mask-image: linear-gradient(to top, #000 10%, rgba(0, 0, 0, 0) 60%);
+}
+.intro-lane {
+  position: absolute;
+  left: calc(50% + var(--h) * (var(--mid) - var(--dash) / 2) / 10);
+  top: calc(var(--h) * var(--period) / -10);
+  bottom: 0;
+  width: calc(var(--h) * var(--dash) / 10);
+  /* a 2 m dash in a 9 m period, soft at both ends */
+  background: linear-gradient(
+      to bottom,
+      rgba(240, 242, 236, 0) 0%,
+      rgba(240, 242, 236, 0) 76.5%,
+      rgba(240, 242, 236, 0.95) 78.5%,
+      rgba(240, 242, 236, 0.95) 98%,
+      rgba(240, 242, 236, 0) 100%
+    )
+    0 100% / 100% calc(var(--h) * var(--period) / 10) repeat-y;
+}
+#rvl-intro[data-go] .intro-lane {
+  animation: intro-lane 0.52s linear var(--t-road) infinite;
+}
+@keyframes intro-lane {
+  to {
+    transform: translateY(calc(var(--h) * var(--period) / 10));
+  }
+}
+
+/* Sign: a board facing the camera, so growing it about the vanishing point is exact
+   perspective. Laid out at the size it reaches as the overlay dissolves. */
+.intro-sign-rig {
+  transform: scale(0.82);
+}
+#rvl-intro[data-go] .intro-sign-rig {
+  animation: intro-sign 1.6s linear var(--t-road) both;
+}
+@keyframes intro-sign {
+  from {
+    transform: scale(0.82);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.intro-sign {
+  position: absolute;
+  right: var(--sr);
+  bottom: var(--sb);
+  width: var(--sw);
+  font-size: calc(var(--sw) / 10);
+  line-height: 1;
+}
+.intro-sign-post {
+  position: absolute;
+  top: 60%;
+  width: 0.26em;
+  height: calc(40% + var(--sp));
+  background: linear-gradient(90deg, #7b838a, #d6dbde 45%, #8a9298);
+}
+.intro-sign-post:first-child {
+  left: 20%;
+}
+.intro-sign-post:nth-child(2) {
+  right: 20%;
+}
+.intro-sign-post::after {
+  content: "";
+  position: absolute;
+  right: -0.55em;
+  bottom: -0.14em;
+  left: -0.55em;
+  height: 0.3em;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(12, 22, 12, 0.5), rgba(12, 22, 12, 0));
+}
+.intro-sign-board {
+  position: relative;
+  padding: 0.62em 0.6em 0.66em;
+  border-radius: 0.42em;
+  background: linear-gradient(168deg, #11824a 0%, #0b6d3d 48%, #095a33 100%);
+  box-shadow:
+    0 0 0 0.08em #0a5e35,
+    0 0.25em 0.9em rgba(8, 20, 14, 0.38);
+  color: #f6f8f3;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.intro-sign-board::before {
+  content: "";
+  position: absolute;
+  inset: 0.16em;
+  border: 0.09em solid rgba(246, 248, 243, 0.95);
+  border-radius: 0.3em;
+}
+.intro-sign-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34em;
+  font-size: 0.78em;
+  letter-spacing: 0.035em;
+}
+.intro-sign-top svg {
+  flex: none;
+  width: 1.1em;
+  height: 0.62em;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.intro-sign-main {
+  margin-top: 0.14em;
+  font-size: 1.6em;
+  letter-spacing: 0.01em;
+}
+
+/* One grade over the whole scene so the drawn parts and the photograph read as one image. */
+.intro-hwy-grade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(130% 105% at 58% 42%, rgba(9, 16, 12, 0) 42%, rgba(9, 16, 12, 0.4) 100%);
+}
+.intro-hwy-grade::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.09;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* --------------------------------------------------------------------------
+   Clock and exit
+   -------------------------------------------------------------------------- */
+/* Carries no visible change: its animationend tells the script the timeline has played. */
+.intro-clock {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+#rvl-intro[data-go] .intro-clock {
+  animation: intro-clock var(--t-end) linear both;
+}
+@keyframes intro-clock {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Drive-through: the road pushes forward as the overlay dissolves into the hero. */
+#rvl-intro[data-state="exit"] {
+  pointer-events: none;
+  animation: intro-fade-out 0.5s cubic-bezier(0.4, 0, 0.7, 1) both;
+}
+#rvl-intro[data-state="exit"] .intro-hwy-exit {
+  animation: intro-hwy-exit 0.55s cubic-bezier(0.5, 0, 0.85, 0.45) both;
+}
+#rvl-intro[data-state="exit"] .intro-sign-exit {
+  animation: intro-sign-exit 0.55s cubic-bezier(0.5, 0, 0.85, 0.45) both;
+}
+@keyframes intro-hwy-exit {
+  to {
+    transform: scale(1.6);
+  }
+}
+@keyframes intro-sign-exit {
+  to {
+    transform: scale(1.9);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Layouts
+   -------------------------------------------------------------------------- */
+/* Squarer screens (tablets, narrow windows): title above the island. */
+@media (max-aspect-ratio: 11/10) {
+  #rvl-intro {
+    --u: calc(var(--vh) * 0.2297);
+    --z: 3.8;
+    /* island centred, 58% down */
+    --t0x: calc(var(--vh) * -8.055);
+    --t0y: calc(var(--vh) * 19.885);
+    --title: min(calc(var(--vw) * 11), calc(var(--vh) * 8.5));
+    --label: calc(var(--vh) * 4.6);
+  }
+  .intro-title {
+    right: 0;
+    left: 0;
+    top: calc(var(--vh) * 10);
+    transform: none;
+    text-align: center;
+  }
+}
+
+/* Portrait: the upright photograph. */
+@media (max-aspect-ratio: 4/5) {
+  .intro-hwy {
+    --pa: var(--p-pa);
+    --px: var(--p-px);
+    --py: var(--p-py);
+    --mid: var(--p-mid);
+    --period: var(--p-period);
+    --dash: var(--p-dash);
+
+    --pw: max(calc(var(--vw) * 141), calc(var(--vh) * 64.5));
+    --vx: calc(var(--vw) * 64);
+    --vy: calc(var(--vh) * 40);
+    --h: calc(var(--pw) * 1.02);
+    --f: calc(var(--pw) * 1.4);
+    --sw: min(calc(var(--pw) * 0.37), calc(var(--vw) * 54));
+    --sr: min(calc(var(--pw) * 0.055), calc(var(--vw) * 8));
+    --sb: calc(var(--pw) * 0.033);
+    --sp: calc(var(--pw) * 0.085);
+  }
+  .intro-back-l {
+    display: none;
+  }
+  .intro-back-p {
+    display: block;
+  }
+  .intro-hwy-grade {
+    background: radial-gradient(150% 100% at 64% 40%, rgba(9, 16, 12, 0) 42%, rgba(9, 16, 12, 0.4) 100%);
+  }
+}
+
+/* Phones: sizes follow the width. */
+@media (max-aspect-ratio: 62/100) {
+  #rvl-intro {
+    --u: calc(var(--vw) * 0.3165);
+    --z: 2.6;
+    /* island centred, 57% down */
+    --t0x: calc(var(--vw) * -16.22);
+    --t0y: calc(var(--vh) * 7 + var(--vw) * 23.93);
+    --title: calc(var(--vw) * 11.5);
+    --label: calc(var(--vw) * 9.4);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The page underneath
+   -------------------------------------------------------------------------- */
+/* Let the hero card and its photograph paint under the cover instead of waiting at
+   [data-reveal] { opacity: 0 }, so they are decoded and on screen when the cover lifts. */
+#rvl-intro[data-state] ~ main [data-hero-card] {
+  opacity: 1;
+}
+
+/* No scrolling under the cover before Lenis is up (it takes over with lenis.stop()). The
+   gutter stays reserved so the page does not shift when the scrollbar comes back. */
+html:has(#rvl-intro[data-state="play"]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* The script never starts the intro for visitors who prefer reduced motion; this is the
+   belt to its braces. */
+@media (prefers-reduced-motion: reduce) {
+  #rvl-intro {
+    display: none !important;
+  }
+}

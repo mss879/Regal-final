@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Regal Victoria Lakeside — design tokens
+   Cream paper, deep forest, sage and leaf green, taken from the brochure.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-paper: #faf7f1;
+  --color-cream: #f2ede3;
+  --color-cream-2: #e7e0d2;
+  --color-sand: #d9cfbc;
+  --color-forest: #12231a;
+  --color-forest-2: #1b3326;
+  --color-forest-3: #264634;
+  --color-moss: #4a6a4e;
+  --color-sage: #a8b7a1;
+  --color-sage-2: #c9d3c3;
+  --color-leaf: #5c8c45;
+  --color-leaf-2: #7fae5f;
+  --color-lime: #c5dc9f;
+  --color-ink: #151d18;
+  --color-ink-2: #45514a;
+  --color-sold: #b3262e;
+  --color-sold-2: #e2686e;
+  --color-design: #b98a52;
+
+  --radius-card: 28px;
+  --radius-card-lg: 36px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+
+  --text-mega: clamp(4.25rem, 14vw, 14rem);
+  --text-mega--line-height: 0.82;
+  --text-display: clamp(2.6rem, 6.4vw, 6.5rem);
+  --text-display--line-height: 0.95;
+  --text-title: clamp(1.9rem, 3.6vw, 3.4rem);
+  --text-title--line-height: 1.04;
+}
+
+@theme inline {
+  --font-display: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), ui-serif, Georgia, serif;
+}
+
+@utility container-x {
+  width: 100%;
+  max-width: 1480px;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3vw, 2.5rem);
+}
+
+@utility eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-paper);
+    font-family: var(--font-sans);
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: var(--color-lime);
+    color: var(--color-forest);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-leaf);
+    outline-offset: 3px;
+  }
+
+  img {
+    user-select: none;
+  }
+}
+
+/* Elements animated in by GSAP start hidden (only when JS runs and the visitor
+   hasn't asked for reduced motion). <noscript> in the layout undoes this. */
+[data-reveal] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+}
+
+/* SplitText line masks */
+.split-line {
+  padding-bottom: 0.06em;
+  margin-bottom: -0.06em;
+}
+
+/* Grain overlay for the dark sections */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Marquee */
+@keyframes marquee {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+.marquee-track {
+  animation: marquee var(--marquee-duration, 38s) linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* Map hotspots */
+@keyframes pin-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.pin-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pin-pulse 2.4s var(--ease-out-expo) infinite;
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+.lenis [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+/* Hide native scrollbar on horizontal tracks */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Long-form text: guides and policies. Elements inside .not-prose keep their own styles. */
+.rvl-prose {
+  color: var(--color-ink-2);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.rvl-prose > * + * {
+  margin-top: 1.15em;
+}
+.rvl-prose h2 {
+  margin-top: 2.2em;
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--color-forest);
+}
+.rvl-prose h3 {
+  margin-top: 1.8em;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--color-forest);
+}
+.rvl-prose h2 + *,
+.rvl-prose h3 + * {
+  margin-top: 0.7em;
+}
+.rvl-prose strong {
+  font-weight: 600;
+  color: var(--color-forest);
+}
+.rvl-prose a:not(:where(.not-prose, .not-prose *)) {
+  color: var(--color-forest);
+  text-decoration: underline;
+  text-decoration-color: var(--color-leaf-2);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: color 0.3s, text-decoration-color 0.3s;
+}
+.rvl-prose a:not(:where(.not-prose, .not-prose *)):hover {
+  color: var(--color-leaf);
+  text-decoration-color: var(--color-leaf);
+}
+.rvl-prose ul:not(:where(.not-prose, .not-prose *)) > li {
+  position: relative;
+  padding-left: 1.4em;
+}
+.rvl-prose ul:not(:where(.not-prose, .not-prose *)) > li + li {
+  margin-top: 0.6em;
+}
+.rvl-prose ul:not(:where(.not-prose, .not-prose *)) > li::before {
+  content: "";
+  position: absolute;
+  left: 0.15em;
+  top: 0.72em;
+  width: 0.4em;
+  height: 0.4em;
+  border-radius: 9999px;
+  background: var(--color-leaf);
+}
+.rvl-prose table:not(:where(.not-prose, .not-prose *)) {
+  width: 100%;
+  font-size: 0.9rem;
+}
+.rvl-prose th:not(:where(.not-prose, .not-prose *)),
+.rvl-prose td:not(:where(.not-prose, .not-prose *)) {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-forest) 12%, transparent);
+  padding: 0.6em 0.8em 0.6em 0;
+  text-align: left;
+  vertical-align: top;
+}

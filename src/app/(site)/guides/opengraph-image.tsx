@@ -1,0 +1,10 @@
+import { IMAGES } from "@/lib/images";
+import { OG_CONTENT_TYPE, OG_SIZE, renderOg } from "@/lib/og/render";
+
+export const alt = "Guides to lakeside living in Kandy from Regal Victoria Lakeside";
+export const size = OG_SIZE;
+export const contentType = OG_CONTENT_TYPE;
+
+export default function Image() {
+  return renderOg({ eyebrow: "Guides", title: "Guides to", accent: "lakeside living", detail: "Villas · Lakefront · Digana · Buying in Sri Lanka", image: IMAGES.about.setting });
+}
