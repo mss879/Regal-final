@@ -3,7 +3,8 @@ export type EnquiryStatus = "new" | "read" | "archived";
 export type Enquiry = {
   id: string;
   name: string;
-  email: string;
+  /** Chat enquiries may have only a phone number. */
+  email: string | null;
   phone: string | null;
   lot: string | null;
   interest: string;
@@ -12,8 +13,26 @@ export type Enquiry = {
   source_path: string | null;
   status: EnquiryStatus;
   lead_id: string | null;
+  channel: "form" | "chat";
+  chat_session_id: string | null;
   created_at: string;
 };
+
+export type ChatSession = {
+  id: string;
+  started_path: string | null;
+  message_count: number;
+  enquiry_id: string | null;
+  /** Human takeover: the AI doesn't answer while true. */
+  ai_paused: boolean;
+  last_role: "user" | "assistant" | "agent" | null;
+  visitor_seen_at: string | null;
+  created_at: string;
+  last_message_at: string;
+};
+
+/** user = visitor, assistant = the AI, agent = staff. */
+export type ChatLine = { id: number; role: "user" | "assistant" | "agent"; content: string; created_at: string };
 
 export type StageColor = "lime" | "sage" | "leaf" | "moss" | "forest" | "sand" | "design" | "sold";
 export type StageKind = "open" | "won" | "lost";

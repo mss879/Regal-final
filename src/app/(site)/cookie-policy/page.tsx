@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SITE } from "@/lib/site";
 import { INTRO_PLAYED_KEY } from "@/lib/intro";
+import { CHAT_STORAGE_KEY, TEASER_KEY } from "@/components/chat/shared";
 import { pageMetadata } from "@/lib/seo";
 import { LegalPage } from "@/components/legal/LegalPage";
 
@@ -54,6 +55,14 @@ export default function CookiePolicyPage() {
           </tr>
           <tr>
             <td>
+              <code>{CHAT_STORAGE_KEY}</code>, <code>{TEASER_KEY}</code>
+            </td>
+            <td>Session storage</td>
+            <td>Keeps your conversation with the AI assistant while you move between pages, and remembers that you&apos;ve seen its welcome note. Only set if you use the chat.</td>
+            <td>Until you close the tab</td>
+          </tr>
+          <tr>
+            <td>
               <code>sb-…-auth-token</code>
             </td>
             <td>Cookie (staff only)</td>
@@ -63,8 +72,8 @@ export default function CookiePolicyPage() {
         </tbody>
       </table>
       <p>
-        Both are strictly necessary, so the law does not require us to ask for your consent and you won&apos;t see a cookie
-        banner on this site.
+        These are strictly necessary for features you use, so the law does not require us to ask for your consent and you
+        won&apos;t see a cookie banner on this site.
       </p>
 
       <h2>Analytics without cookies</h2>

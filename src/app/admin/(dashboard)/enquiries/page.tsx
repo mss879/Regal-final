@@ -44,7 +44,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
 
   let list = supabase
     .from("enquiries")
-    .select("id, name, email, phone, lot, interest, message, preferred_viewing_at, source_path, status, lead_id, created_at", { count: "exact" })
+    .select("id, name, email, phone, lot, interest, message, preferred_viewing_at, source_path, status, lead_id, channel, chat_session_id, created_at", { count: "exact" })
     .order("created_at", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
   if (tab === "inbox") list = list.neq("status", "archived");
@@ -135,13 +135,14 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
                       {e.status === "new" && <span className="size-2 shrink-0 rounded-full bg-leaf" aria-label="New" />}
                       {e.name}
                     </p>
-                    <p className="truncate text-[0.82rem] text-ink-2">{e.email}{e.phone ? ` · ${e.phone}` : ""}</p>
+                    <p className="truncate text-[0.82rem] text-ink-2">{[e.email, e.phone].filter(Boolean).join(" · ")}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone={INTEREST_TONE[e.interest] ?? "neutral"}>{interestLabel(e.interest)}</Badge>
                     {e.lot && <Badge tone="outline">{lotLabel(e.lot)}</Badge>}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 text-[0.8rem] text-ink-2">
+                    {e.channel === "chat" && <Badge tone="lime">AI chat</Badge>}
                     {e.lead_id && <Badge tone="forest">In CRM</Badge>}
                     {e.status === "archived" && <Badge tone={STATUS_TONE.archived}>Archived</Badge>}
                     {e.preferred_viewing_at && (
@@ -180,6 +181,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
                   <Badge tone={STATUS_TONE[current.status]}>{current.status === "new" ? "New" : current.status === "read" ? "Read" : "Archived"}</Badge>
                   <Badge tone={INTEREST_TONE[current.interest] ?? "neutral"}>{interestLabel(current.interest)}</Badge>
                   {current.lead_id && <Badge tone="forest">In CRM</Badge>}
+                  {current.channel === "chat" && <Badge tone="lime">Via AI chat</Badge>}
                 </div>
               </div>
               <Link href={href({ id: null })} scroll={false} className={buttonClass("ghost", "sm", "!px-2")} aria-label="Close">
@@ -193,7 +195,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
               <dl className="grid gap-x-6 gap-y-4 rounded-[20px] bg-cream p-5 text-[0.9rem] sm:grid-cols-2">
                 <div>
                   <dt className="text-[0.68rem] font-semibold tracking-[0.14em] text-ink-2 uppercase">Email</dt>
-                  <dd className="mt-1 break-all"><a href={`mailto:${current.email}`} className="text-forest underline decoration-leaf-2 underline-offset-4">{current.email}</a></dd>
+                  <dd className="mt-1 break-all">{current.email ? <a href={`mailto:${current.email}`} className="text-forest underline decoration-leaf-2 underline-offset-4">{current.email}</a> : "—"}</dd>
                 </div>
                 <div>
                   <dt className="text-[0.68rem] font-semibold tracking-[0.14em] text-ink-2 uppercase">Phone</dt>
@@ -224,7 +226,13 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
                 <h3 className="eyebrow text-ink-2">Message</h3>
                 <p className="mt-3 text-[0.95rem] leading-relaxed whitespace-pre-line text-forest">{current.message || <span className="text-ink-2">No message.</span>}</p>
               </div>
-              {current.source_path && <p className="text-[0.75rem] text-ink-2">Sent from {current.source_path}</p>}
+              {current.chat_session_id ? (
+                <Link href={`/admin/chats?id=${current.chat_session_id}` as Route} className={buttonClass("outline", "sm")}>
+                  <Icon name="chat" className="size-4" /> Read the chat transcript
+                </Link>
+              ) : (
+                current.source_path && <p className="text-[0.75rem] text-ink-2">Sent from {current.source_path}</p>
+              )}
             </div>
           </aside>
         </div>

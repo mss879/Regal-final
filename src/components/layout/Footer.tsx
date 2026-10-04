@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Route } from "next";
-import { FOOTER_EXPLORE, LEGAL_LINKS, SITE, SOCIAL, TEAM } from "@/lib/site";
+import { CREDIT, FOOTER_EXPLORE, LEGAL_LINKS, SITE, SOCIAL, TEAM } from "@/lib/site";
 import { GUIDES } from "@/lib/guides";
 import { villasInOrder } from "@/lib/lots";
 import { Logo } from "@/components/ui/Logo";
@@ -31,7 +32,8 @@ export function Footer() {
   return (
     <footer className="grain relative overflow-hidden bg-forest text-paper">
       <FooterReveal>
-        <div className="container-x pt-24 pb-10 md:pt-32">
+        {/* Bottom padding keeps the last line clear of the floating chat button. */}
+        <div className="container-x pt-24 pb-24 md:pt-32">
           <div className="grid gap-14 border-b border-paper/10 pb-16 lg:grid-cols-12">
             <div className="lg:col-span-4" data-reveal>
               <p className="font-serif text-[clamp(2rem,3.6vw,3.2rem)] leading-[1.05] font-light italic text-lime">
@@ -103,7 +105,7 @@ export function Footer() {
             <Logo className="w-56 text-paper sm:w-64 md:w-72 lg:w-80" />
           </div>
 
-          <div className="flex flex-col gap-4 border-t border-paper/10 pt-8 text-xs text-sage md:flex-row md:items-start md:justify-between">
+          <div className="grid gap-6 border-t border-paper/10 pt-8 text-xs text-sage md:grid-cols-3 md:items-start md:gap-8">
             <div className="space-y-3">
               <p>© {YEAR} {TEAM.developer.name}. Architecture by {TEAM.architect.name}.</p>
               <ul className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Legal">
@@ -114,7 +116,24 @@ export function Footer() {
                 ))}
               </ul>
             </div>
-            <p className="max-w-xl md:text-right">* {SITE.disclaimer}</p>
+            {/* Site credit: a plain followed link so it passes search value to ARC AI. */}
+            <a
+              href={CREDIT.url}
+              target="_blank"
+              rel="noopener"
+              title={CREDIT.title}
+              className="group order-last flex items-center gap-2.5 justify-self-start transition-colors hover:text-paper md:order-none md:justify-self-center"
+            >
+              <span>Designed and built by</span>
+              <Image
+                src={CREDIT.logoLight.src}
+                alt={CREDIT.name}
+                width={84}
+                height={20}
+                className="h-5 w-auto opacity-90 transition-opacity group-hover:opacity-100"
+              />
+            </a>
+            <p className="max-w-xl md:justify-self-end md:text-right">* {SITE.disclaimer}</p>
           </div>
         </div>
       </FooterReveal>

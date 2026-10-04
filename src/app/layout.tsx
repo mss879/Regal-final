@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Jost, Manrope } from "next/font/google";
-import { SITE, TEAM } from "@/lib/site";
+import { CREDIT, SITE, TEAM } from "@/lib/site";
 import "lenis/dist/lenis.css";
 import "./globals.css";
 
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: `%s · ${SITE.name}`,
   },
   description: SITE.description,
-  creator: TEAM.developer.name,
+  creator: CREDIT.name,
   publisher: TEAM.developer.name,
   category: "Real estate",
   formatDetection: { telephone: false, address: false, email: false },

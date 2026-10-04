@@ -50,6 +50,17 @@ export default function PrivacyPolicyPage() {
         be turned back into your IP address; it is used only to limit repeated submissions and is deleted after seven days.
       </p>
 
+      <h3>When you chat with our AI assistant</h3>
+      <p>
+        The chat on this website is an AI assistant. To answer you, the messages you type are sent to our AI provider,
+        OpenAI, which generates the replies. We store the conversation (your messages and the assistant&apos;s replies,
+        with the page you started on) so our team can follow up and improve the service. If you give the assistant your
+        name, email, phone number, villa of interest or a preferred viewing time and agree to be contacted, it saves them as
+        an enquiry, just like the enquiry form. Please don&apos;t share sensitive information in the chat. While the chat is
+        open, the conversation is also kept in your browser&apos;s session storage so it survives page loads; it is cleared
+        when you close the tab.
+      </p>
+
       <h3>When you browse the website</h3>
       <p>
         We count page views with our own cookieless analytics. For each page view we record the page, the website that
@@ -74,6 +85,10 @@ export default function PrivacyPolicyPage() {
           <strong>To arrange and manage site visits</strong> you have asked for.
         </li>
         <li>
+          <strong>To answer your questions in the chat</strong> and pass on your request when you ask the assistant to —
+          with your consent and in our legitimate interest in helping prospective buyers.
+        </li>
+        <li>
           <strong>To manage our relationship with prospective buyers</strong>, including keeping a record of our
           conversations in our sales system — in our legitimate interest in selling the villas.
         </li>
@@ -95,8 +110,12 @@ export default function PrivacyPolicyPage() {
       <ul>
         <li>our sales team and the staff who handle enquiries;</li>
         <li>
-          service providers who host and run the website and its database (including Supabase, which stores enquiries and
-          our sales records, and our website hosting provider);
+          service providers who host and run the website and its database (including Supabase, which stores enquiries,
+          chats and our sales records, and our website hosting provider);
+        </li>
+        <li>
+          OpenAI, which processes chat messages to generate the AI assistant&apos;s replies (under its API terms, data sent
+          through its API is not used to train its models);
         </li>
         <li>professional advisers such as lawyers and notaries, if you go on to buy;</li>
         <li>authorities, where the law requires us to.</li>
@@ -114,6 +133,10 @@ export default function PrivacyPolicyPage() {
           <strong>Enquiries and sales records:</strong> for as long as we are in contact with you about a villa, and
           generally for no more than three years after our last contact. If you buy a villa, we keep the records the law
           requires for as long as it requires them.
+        </li>
+        <li>
+          <strong>AI chat conversations:</strong> 12 months, unless they led to an enquiry, in which case they are kept with
+          it.
         </li>
         <li>
           <strong>Spam-protection hashes:</strong> seven days.

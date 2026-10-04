@@ -60,6 +60,13 @@ export default function TermsPage() {
         <Link href="/privacy-policy">privacy policy</Link>.
       </p>
 
+      <h2>AI assistant</h2>
+      <p>
+        The chat on this website is an automated AI assistant. Its answers are generated automatically and may be incomplete
+        or wrong; they are not an offer, advice or a commitment by us. Please confirm anything important with our team, and
+        don&apos;t share sensitive personal information in the chat.
+      </p>
+
       <h2>Intellectual property</h2>
       <p>
         The content of this website — including text, photographs, renders, plans, videos, the {SITE.name} name and logo — is

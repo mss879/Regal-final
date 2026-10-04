@@ -4,6 +4,7 @@ const PATHS = {
   inbox: "M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5M4 13h4.5l1 2h5l1-2H20",
   kanban: "M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v6h-4z",
   calendar: "M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM4 10h16M8 3v4M16 3v4",
+  chat: "M4 5h16v11H9l-5 4V5zM8 9h8M8 12h5",
   plus: "M12 5v14M5 12h14",
   close: "M6 6l12 12M18 6 6 18",
   lock: "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",

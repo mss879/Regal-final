@@ -18,7 +18,9 @@ Copy `.env.example` to `.env.local` and fill it in (and add the same variables i
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key (or the legacy anon key) |
 | `SUPABASE_SECRET_KEY` | Secret key (or legacy service_role). **Server only.** |
-| `ANALYTICS_SALT` | `openssl rand -hex 32` |
+| `ANALYTICS_SALT` | `openssl rand -hex 32` (secret) |
+| `OPENAI_API_KEY` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) — powers the AI assistant (secret) |
+| `OPENAI_MODEL` | Optional — defaults to `gpt-6-luna` |
 | `GOOGLE_SITE_VERIFICATION` | Optional — Search Console HTML-tag code |
 
 With the variables empty the public site still builds and runs; `/admin` shows a setup checklist.
@@ -36,7 +38,7 @@ With the variables empty the public site still builds and runs; `/admin` shows a
 4. **Authentication → Sign In / Providers**: turn off *Allow new users to sign up*.
    **Authentication → URL Configuration**: Site URL `https://regalvictorialakeside.com`.
 5. Run **Advisors → Security** and check it's clean.
-6. Before launch, clear test traffic: `delete from public.page_views;`
+6. Before launch, clear test data: `delete from public.page_views; delete from public.chat_sessions;`
 
 `npm run db:test` applies the migrations to a throwaway local Postgres (Homebrew `postgresql@16`, no Docker)
 and runs the access-control and workflow assertions in `scripts/db-test/tests.sql`.
@@ -49,6 +51,26 @@ and runs the access-control and workflow assertions in `scripts/db-test/tests.sq
   **New Leads** stage can't be renamed or deleted (enforced in the database).
 - **Viewings** — month calendar. Visitors who choose “Arranging a site visit” can suggest a time; it shows as
   *Requested* until confirmed.
+- **AI chats** — every conversation with the website's AI assistant, saved message by message. Open a chat to
+  watch it live, switch **AI replies off** and answer the visitor yourself (replying switches the AI off
+  automatically; switch it back on when you're done). Badges show *Live*, *AI off* and *Needs reply*.
+
+## AI assistant (bottom-right chat)
+
+Built like our other client agents: Vercel AI SDK v6 (`generateText`, `tool`, `stopWhen: stepCountIs(4)`) with
+OpenAI `gpt-6-luna` (reasoning off for speed and tool calling), markdown replies, and every message logged to Supabase.
+
+- `src/lib/chat/knowledge.ts` — the agent's instructions. Facts are built from `src/lib/site.ts`, `lots.ts` and
+  `guides.ts`, so villa specs and availability always match the website. Edit the *Rules* / *Style* text to
+  change behaviour.
+- `src/app/api/chat/route.ts` — saves the visitor's message, calls the model, saves the reply. Its
+  `saveEnquiry` tool stores name + email/phone, villa and an optional viewing time as an **enquiry** (and a
+  *Requested* viewing) — the same inbox and calendar as the contact form. `GET` is polled by the widget for
+  staff replies.
+- `src/components/chat/` — the widget. Only the small launcher loads with the page; the panel is fetched on
+  first hover/click.
+- Limits (to protect the OpenAI bill): 20 messages per 10 minutes per visitor, 80 per chat per day, 6 saved
+  enquiries per hour per visitor. With no `OPENAI_API_KEY` the chat politely gives the phone number and email.
 
 New admin features: add a route under `src/app/admin/(dashboard)/` and an entry in `src/lib/admin/features.ts`
 (that drives the sidebar and the dashboard cards). Every admin page and Server Action calls `requireAdmin()`.

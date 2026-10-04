@@ -15,6 +15,8 @@ export type DashboardSummary = {
   viewings_upcoming: number;
   viewings_requested: number;
   viewings_today: number;
+  chats_7d: number;
+  chats_with_enquiry: number;
 };
 
 export type AdminFeature = {
@@ -65,6 +67,17 @@ export const ADMIN_FEATURES: AdminFeature[] = [
     stats: (s) => [
       { value: s.viewings_upcoming, label: "upcoming" },
       { value: s.viewings_requested, label: "to confirm" },
+    ],
+  },
+  {
+    key: "chats",
+    href: "/admin/chats",
+    label: "AI chats",
+    description: "Conversations with the website's AI assistant, and the leads it captured.",
+    icon: "chat",
+    stats: (s) => [
+      { value: s.chats_7d ?? 0, label: "this week" },
+      { value: s.chats_with_enquiry ?? 0, label: "leads (30 days)" },
     ],
   },
 ];

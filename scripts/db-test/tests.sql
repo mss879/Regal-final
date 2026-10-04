@@ -206,5 +206,104 @@ begin
 end $$;
 reset role;
 
+-- ---------------------------------------------------------------- AI chat
+set role service_role;
+do $$
+declare r jsonb; v_enq uuid;
+begin
+  perform public.log_chat_message('22222222-2222-2222-2222-222222222222', 'user', 'Which villas are available?', '/villas');
+  perform public.log_chat_message('22222222-2222-2222-2222-222222222222', 'assistant', 'Five villas are released.', '/villas');
+  assert (select message_count from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222') = 2, 'chat messages counted';
+  assert (select started_path from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222') = '/villas', 'start page kept';
+  assert (select last_role from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222') = 'assistant', 'last role tracked';
+  r := public.chat_poll('22222222-2222-2222-2222-222222222222', 0);
+  assert jsonb_array_length(r->'messages') = 1 and r->'messages'->0->>'role' = 'assistant', 'poll returns replies only: ' || r::text;
+  assert (r->>'paused')::boolean = false, 'AI on by default';
+  assert jsonb_array_length(public.chat_poll(gen_random_uuid(), 0)->'messages') = 0, 'unknown chat polls empty';
+  begin
+    perform public.log_chat_message('22222222-2222-2222-2222-222222222222', 'agent', 'spoof', null);
+    raise exception 'FAIL: service logged an agent message through log_chat_message';
+  exception when invalid_parameter_value then null;
+  end;
+
+  r := public.save_chat_enquiry('22222222-2222-2222-2222-222222222222', 'Ravi Silva', null, '+94 71 000 0000', '9', 'prebook', 'Interested in Lot 09', null, 'chat-rk');
+  assert (r->>'ok')::boolean and not (r->>'updated')::boolean, 'phone-only chat enquiry created: ' || r::text;
+  v_enq := (r->>'id')::uuid;
+  assert (select channel from public.enquiries where id = v_enq) = 'chat', 'channel is chat';
+  assert (select email from public.enquiries where id = v_enq) is null, 'email may be empty for chat leads';
+  assert (select enquiry_id from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222') = v_enq, 'session linked';
+
+  r := public.save_chat_enquiry('22222222-2222-2222-2222-222222222222', 'Ravi Silva', 'Ravi@Example.com', null, null, 'site_visit', null, now() + interval '5 days', 'chat-rk');
+  assert (r->>'updated')::boolean and (r->>'id')::uuid = v_enq, 'second save updates the same enquiry';
+  assert (select email from public.enquiries where id = v_enq) = 'ravi@example.com', 'email added and normalised';
+  assert (select phone from public.enquiries where id = v_enq) = '+94 71 000 0000', 'phone kept';
+  assert (select count(*) from public.viewings where enquiry_id = v_enq and status = 'requested') = 1, 'requested viewing created';
+
+  r := public.save_chat_enquiry('22222222-2222-2222-2222-222222222222', 'Ravi Silva', null, null, null, 'site_visit', null, now() + interval '6 days', 'chat-rk');
+  assert (select count(*) from public.viewings where enquiry_id = v_enq) = 1, 'new time moves the request instead of duplicating it';
+
+  r := public.save_chat_enquiry(gen_random_uuid(), 'No Contact', null, null, null, 'other', null, null, 'chat-rk2');
+  assert r->>'error' = 'missing_contact', 'an email or phone is required';
+  begin
+    insert into public.enquiries (name) values ('Nobody');
+    raise exception 'FAIL: enquiry without contact details';
+  exception when not_null_violation or check_violation then null;
+  end;
+  raise notice 'ok: chat logging and save_chat_enquiry';
+end $$;
+reset role;
+
+set role anon;
+do $$ begin perform public.log_chat_message(gen_random_uuid(), 'user', 'x', null); raise exception 'FAIL: anon logged a chat';
+exception when insufficient_privilege then raise notice 'ok: anon cannot call log_chat_message'; end $$;
+do $$ begin perform public.save_chat_enquiry(gen_random_uuid(), 'x', 'x@x.com', null, null, 'other', null, null, null); raise exception 'FAIL: anon saved a chat enquiry';
+exception when insufficient_privilege then raise notice 'ok: anon cannot call save_chat_enquiry'; end $$;
+do $$ begin perform public.chat_poll(gen_random_uuid(), 0); raise exception 'FAIL: anon polled a chat';
+exception when insufficient_privilege then raise notice 'ok: anon cannot call chat_poll'; end $$;
+do $$ begin perform 1 from public.chat_messages; raise exception 'FAIL: anon read chats';
+exception when insufficient_privilege then raise notice 'ok: anon cannot read chats'; end $$;
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+do $$ begin
+  assert (select count(*) from public.chat_messages) = 0, 'non-admin sees no chats';
+  begin
+    perform public.send_chat_reply('22222222-2222-2222-2222-222222222222', 'x');
+    raise exception 'FAIL: non-admin replied in a chat';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.set_chat_ai('22222222-2222-2222-2222-222222222222', true);
+    raise exception 'FAIL: non-admin paused the AI';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'ok: non-admin sees no chats and cannot take over';
+end $$;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$
+begin
+  assert (select count(*) from public.chat_messages) = 2, 'admin reads chat transcripts';
+  assert (public.admin_dashboard_summary()->>'chats_7d')::int = 2, 'chats counted on the dashboard';
+  assert exists (select 1 from public.activity_log where summary like '%via the AI assistant%'), 'chat enquiry logged in the feed';
+  -- human takeover
+  perform public.send_chat_reply('22222222-2222-2222-2222-222222222222', 'Hi Ravi, this is Nadia from the sales team.');
+  assert (select ai_paused from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222'), 'replying switches the AI off';
+  assert (select author_id from public.chat_messages where role = 'agent') = '00000000-0000-0000-0000-00000000000a', 'staff author recorded';
+  perform public.set_chat_ai('22222222-2222-2222-2222-222222222222', false);
+  assert not (select ai_paused from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222'), 'AI switched back on';
+  begin
+    perform public.send_chat_reply('22222222-2222-2222-2222-222222222222', '   ');
+    raise exception 'FAIL: empty reply accepted';
+  exception when invalid_parameter_value then null;
+  end;
+  delete from public.chat_sessions where id = '22222222-2222-2222-2222-222222222222';
+  assert (select count(*) from public.chat_messages) = 0, 'deleting a chat removes its messages';
+  assert (select chat_session_id from public.enquiries where name = 'Ravi Silva') is null, 'enquiry survives chat deletion';
+  raise notice 'ok: admin chat access and human takeover';
+end $$;
+reset role;
+reset request.jwt.claim.sub;
+
 select private.prune_old_data();
 \echo 'ALL DATABASE TESTS PASSED'

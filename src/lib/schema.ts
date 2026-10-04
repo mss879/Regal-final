@@ -1,7 +1,7 @@
 // schema.org builders for JSON-LD. Entities reference each other by @id, so the site-wide
 // graph (organisation, website, the residence) is emitted once in the (site) layout and pages
 // add their own nodes. Never include data we can't stand behind (no prices, no coordinates).
-import { AMENITIES, COPY, SITE, SOCIAL, TEAM } from "./site";
+import { AMENITIES, COPY, CREDIT, SITE, SOCIAL, TEAM } from "./site";
 import { STATUS_LABEL, type Lot } from "./lots";
 import { IMAGES } from "./images";
 import type { Guide } from "./guides";
@@ -59,6 +59,7 @@ export function siteGraph(): Node[] {
       description: SITE.description,
       inLanguage: "en",
       publisher: { "@id": ORG_ID },
+      creator: { "@type": "Organization", name: CREDIT.name, url: CREDIT.url },
     },
     {
       "@type": "GatedResidenceCommunity",

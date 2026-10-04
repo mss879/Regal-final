@@ -40,6 +40,15 @@ export const SOCIAL = [
   { id: "facebook", label: "Facebook", href: "https://www.facebook.com/regalvictorialakeside", placeholder: true },
 ] as const;
 
+/** Website and AI assistant credit (a normal, followed link — it should pass search value to ARC AI). */
+export const CREDIT = {
+  name: "ARC AI",
+  url: "https://www.arcai.agency",
+  title: "ARC AI — websites, SEO and AI agents",
+  logoLight: { src: "/arc-ai/arc-ai-light.webp", width: 318, height: 76 },
+  logoDark: { src: "/arc-ai/arc-ai-dark.webp", width: 465, height: 106 },
+} as const;
+
 export const LEGAL_LINKS = [
   { href: "/privacy-policy", label: "Privacy policy" },
   { href: "/terms-of-use", label: "Terms of use" },

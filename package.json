@@ -17,17 +17,21 @@
     "prebuild": "node -e \"require('fs').rmSync('.next/cache/turbopack',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.124",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@gsap/react": "^2.1.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
+    "ai": "^6.0.300",
     "gsap": "^3.15.0",
     "lenis": "^1.3.26",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "yet-another-react-lightbox": "^3.32.2",
     "zod": "^4.6.5"

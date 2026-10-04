@@ -89,7 +89,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/admin"
       />
 
       {/* Overview of every admin feature (driven by ADMIN_FEATURES) */}
-      <section aria-label="Overview" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <section aria-label="Overview" className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {ADMIN_FEATURES.filter((f) => f.stats).map((f) => (
           <Link key={f.key} href={f.href} className="group flex flex-col justify-between gap-6 rounded-[24px] border border-forest/10 bg-paper p-5 transition-colors hover:border-forest/25">
             <div className="flex items-start justify-between gap-4">
