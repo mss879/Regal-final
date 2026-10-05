@@ -96,7 +96,7 @@ export const buttonClass = (variant: ButtonVariant = "primary", size: keyof type
   `${BUTTON.base} ${BUTTON.size[size]} ${BUTTON.variant[variant]} ${extra}`;
 
 export const fieldClass =
-  "mt-1.5 block w-full rounded-xl border border-forest/15 bg-white/70 px-3.5 py-2.5 text-[0.92rem] text-forest placeholder:text-ink-2/50 transition-colors focus:border-leaf focus:outline-none focus:ring-2 focus:ring-leaf/20 disabled:opacity-60";
+  "mt-1.5 block w-full rounded-xl border border-forest/15 bg-white/70 px-3.5 py-2.5 text-base text-forest placeholder:text-ink-2/50 pointer-fine:text-[0.92rem] transition-colors focus:border-leaf focus:outline-none focus:ring-2 focus:ring-leaf/20 disabled:opacity-60";
 
 export function FieldLabel({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: ReactNode }) {
   return (

@@ -36,7 +36,7 @@ export default function BrochurePage() {
       </PageHero>
 
       <section className="container-x py-24 md:py-32" aria-label="Brochure pages">
-        <GalleryGrid slides={slides} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4" sizes="(min-width: 1024px) 25vw, 50vw" />
+        <GalleryGrid slides={slides} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4" sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" />
       </section>
     </main>
   );

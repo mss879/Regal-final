@@ -9,6 +9,7 @@ import { FooterReveal } from "./FooterReveal";
 
 // Evaluated at build time (the footer is static) — redeploys keep it current.
 const YEAR = new Date().getFullYear();
+const [MAIL_USER, MAIL_DOMAIN] = SITE.email.split("@");
 
 const ICONS: Record<(typeof SOCIAL)[number]["id"], React.ReactNode> = {
   instagram: (
@@ -80,7 +81,13 @@ export function Footer() {
                 <address className="mt-5 space-y-2.5 text-[0.95rem] not-italic">
                   <p>{SITE.address}</p>
                   <p><a href={SITE.phoneHref} className="transition-colors hover:text-lime">{SITE.phone}</a></p>
-                  <p><a href={`mailto:${SITE.email}`} className="break-all transition-colors hover:text-lime">{SITE.email}</a></p>
+                  {/* Phones wrap the address after the @ rather than mid-domain */}
+                  <p>
+                    <a href={`mailto:${SITE.email}`} className="break-words transition-colors hover:text-lime md:break-all">
+                      {MAIL_USER}@<wbr />
+                      {MAIL_DOMAIN}
+                    </a>
+                  </p>
                 </address>
                 <ul className="mt-6 flex gap-2.5" aria-label="Follow us">
                   {SOCIAL.map((s) => (

@@ -144,7 +144,8 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
             </nav>
           </aside>
 
-          <div className="lg:col-span-8">
+          {/* min-w-0: the villa table scrolls inside its own box instead of widening the page on phones */}
+          <div className="min-w-0 lg:col-span-8">
             {guide.sections.map((s, i) => (
               <section
                 key={s.id}

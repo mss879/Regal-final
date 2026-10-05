@@ -63,8 +63,9 @@ export function ChatPanel({ open, onClose, onUnread }: { open: boolean; onClose:
     } catch {}
   }, [state]);
 
+  // Phones keep the keyboard down until the visitor taps the box, so the greeting stays in view.
   useEffect(() => {
-    if (open) inputRef.current?.focus({ preventScroll: true });
+    if (open && !window.matchMedia("(pointer: coarse)").matches) inputRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   // Listen for staff replies (and the AI being switched on/off): every 4 s while the chat is
@@ -291,7 +292,7 @@ export function ChatPanel({ open, onClose, onUnread }: { open: boolean; onClose:
             }}
             onKeyDown={onKeyDown}
             placeholder={aiPaused ? "Message our team…" : "Ask about the villas…"}
-            className="max-h-28 flex-1 resize-none bg-transparent py-2 text-[0.92rem] text-forest placeholder:text-ink-2/60 focus:outline-none"
+            className="max-h-28 flex-1 resize-none bg-transparent py-2 text-base text-forest placeholder:text-ink-2/60 focus:outline-none pointer-fine:text-[0.92rem]"
           />
           <button
             type="submit"

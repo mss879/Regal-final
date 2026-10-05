@@ -138,7 +138,8 @@ export function Nav() {
       <div
         ref={menu}
         id="site-menu"
-        className="fixed inset-0 z-[60] hidden flex-col justify-between bg-forest px-6 pt-6 pb-10 text-paper"
+        data-lenis-prevent
+        className="fixed inset-0 z-[60] hidden flex-col justify-between gap-8 overflow-y-auto overscroll-contain bg-forest px-6 pt-6 pb-10 text-paper"
         role="dialog"
         aria-modal="true"
         aria-label="Menu"
@@ -161,7 +162,7 @@ export function Nav() {
                 data-menu-item
                 href={item.href as Route}
                 onClick={() => toggle(false)}
-                className="flex items-baseline gap-4 font-display text-[clamp(2.6rem,11vw,4.5rem)] leading-[1.05] font-light uppercase"
+                className="flex items-baseline gap-4 font-display text-[clamp(2.6rem,11vw,4.5rem)] leading-[1.05] font-light uppercase [@media(max-height:560px)]:text-[clamp(1.6rem,7.5svh,2.6rem)]"
               >
                 <span className="font-sans text-xs tracking-[0.2em] text-lime">0{i + 1}</span>
                 {item.label}

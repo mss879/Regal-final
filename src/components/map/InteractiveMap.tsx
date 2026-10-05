@@ -81,6 +81,12 @@ export function InteractiveMap({ lots }: { lots: MapLot[] }) {
     const y = clientY - r.top;
     const w = t.offsetWidth || 280;
     const h = t.offsetHeight || 160;
+    if (x + 22 + w > r.width && x - w - 22 < 0) {
+      // No room beside the point (phones): dock the card under the plan, so every lot stays tappable.
+      mover.current.x(Math.max((r.width - w) / 2, 0));
+      mover.current.y(r.height + 12);
+      return;
+    }
     const nx = x + 22 + w > r.width ? x - w - 22 : x + 22;
     const ny = Math.min(Math.max(y - h / 2, 8), r.height - h - 8);
     mover.current.x(nx);
@@ -127,6 +133,11 @@ export function InteractiveMap({ lots }: { lots: MapLot[] }) {
         onPointerMove={onMove}
         onPointerDown={(e) => {
           pointerType.current = e.pointerType;
+          // Touch: a tap on the plan away from any lot, pin or the card closes the card.
+          if (e.pointerType !== "mouse" && !(e.target as Element).closest("a, [tabindex], [role=status]")) {
+            setActive(null);
+            setArmed(null);
+          }
         }}
         onPointerLeave={(e) => {
           if (e.pointerType === "mouse") setActive(null);
@@ -372,7 +383,9 @@ export function InteractiveMap({ lots }: { lots: MapLot[] }) {
           </div>
         ))}
         <p className="mt-6 text-[0.75rem] leading-relaxed text-sage">
-          Hover a lot for details. Available villas open their full catalogue; sold lots are shown in red.
+          <span className="pointer-coarse:hidden">Hover</span>
+          <span className="hidden pointer-coarse:inline">Tap</span> a lot for details. Available villas open their full catalogue; sold
+          lots are shown in red.
         </p>
       </aside>
     </div>
