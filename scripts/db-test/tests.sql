@@ -305,5 +305,80 @@ end $$;
 reset role;
 reset request.jwt.claim.sub;
 
+-- WhatsApp chat
+do $$
+declare
+  v_first bigint;
+  v_repeat bigint;
+begin
+  v_first := public.log_whatsapp_inbound('94771234567', null, 'Ravi', 'wamid.in1', 'text', 'Hello, is lot 17 available?', now());
+  assert v_first is not null, 'customer message logged';
+  v_repeat := public.log_whatsapp_inbound('94771234567', null, 'Ravi', 'wamid.in1', 'text', 'Hello, is lot 17 available?', now());
+  assert v_repeat is null, 'a repeat webhook delivery is ignored';
+  assert (select count(*) from public.whatsapp_messages) = 1, 'only one copy of the message saved';
+  assert (select unread_count from public.whatsapp_conversations where contact_id = '94771234567') = 1, 'unread counted once';
+  perform public.log_whatsapp_inbound('94771234567', 'LK.123', null, 'wamid.in2', 'image', '[Photo]', now());
+  assert (select profile_name from public.whatsapp_conversations where contact_id = '94771234567') = 'Ravi', 'a blank name keeps the known name';
+  assert (select bsuid from public.whatsapp_conversations where contact_id = '94771234567') = 'LK.123', 'business-scoped ID stored';
+  assert (select count(*) from public.whatsapp_conversations) = 1, 'one conversation per customer';
+  raise notice 'ok: WhatsApp inbound logging';
+end $$;
+
+set role anon;
+do $$
+begin
+  perform 1 from public.whatsapp_messages;
+  raise exception 'FAIL: anon read WhatsApp messages';
+exception when insufficient_privilege then null;
+end $$;
+do $$
+begin
+  perform public.log_whatsapp_inbound('94770000000', null, null, 'wamid.anon', 'text', 'x', now());
+  raise exception 'FAIL: anon wrote a WhatsApp message';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+do $$
+begin
+  assert (select count(*) from public.whatsapp_messages) = 0, 'non-admins see no WhatsApp messages';
+  begin
+    perform public.log_whatsapp_reply((select gen_random_uuid()), 'wamid.x', 'hi');
+    raise exception 'FAIL: non-admin logged a reply';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$
+declare
+  v_conversation uuid := (select id from public.whatsapp_conversations where contact_id = '94771234567');
+begin
+  assert (select count(*) from public.whatsapp_messages) = 2, 'admin reads WhatsApp messages';
+  perform public.mark_whatsapp_read(v_conversation);
+  assert (select unread_count from public.whatsapp_conversations where id = v_conversation) = 0, 'opening a chat clears unread';
+  perform public.log_whatsapp_reply(v_conversation, 'wamid.out1', 'Yes it is. Shall I arrange a visit?');
+  assert (select last_direction from public.whatsapp_conversations where id = v_conversation) = 'out', 'reply updates the conversation';
+  assert (select author_id from public.whatsapp_messages where wamid = 'wamid.out1') = '00000000-0000-0000-0000-00000000000a', 'staff author recorded';
+end $$;
+reset role;
+reset request.jwt.claim.sub;
+
+do $$
+begin
+  perform public.update_whatsapp_status('wamid.out1', 'read');
+  perform public.update_whatsapp_status('wamid.out1', 'delivered');
+  assert (select status from public.whatsapp_messages where wamid = 'wamid.out1') = 'read', 'a late webhook never moves a status backwards';
+  perform public.update_whatsapp_status('wamid.out1', 'failed', 'Number unavailable');
+  assert (select status from public.whatsapp_messages where wamid = 'wamid.out1') = 'failed', 'failure is recorded';
+  perform public.update_whatsapp_status('wamid.out1', 'delivered');
+  assert (select status from public.whatsapp_messages where wamid = 'wamid.out1') = 'failed', 'failure is final';
+  delete from public.whatsapp_conversations;
+  assert (select count(*) from public.whatsapp_messages) = 0, 'deleting a conversation removes its messages';
+  raise notice 'ok: WhatsApp staff replies and delivery status';
+end $$;
+
 select private.prune_old_data();
 \echo 'ALL DATABASE TESTS PASSED'

@@ -13,6 +13,10 @@ export const env = {
   supabasePublishableKey: read("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ?? read("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   supabaseSecretKey: read("SUPABASE_SECRET_KEY") ?? read("SUPABASE_SERVICE_ROLE_KEY"),
   analyticsSalt: read("ANALYTICS_SALT"),
+  whatsappAccessToken: read("WHATSAPP_ACCESS_TOKEN"),
+  whatsappPhoneNumberId: read("WHATSAPP_PHONE_NUMBER_ID"),
+  whatsappAppSecret: read("WHATSAPP_APP_SECRET"),
+  whatsappVerifyToken: read("WHATSAPP_VERIFY_TOKEN"),
 };
 
 /** Names of required variables that are not set. */
@@ -24,6 +28,10 @@ export function missingEnv(): string[] {
     !env.analyticsSalt && "ANALYTICS_SALT",
   ].filter((v): v is string => Boolean(v));
 }
+
+/** True when WhatsApp messages can be received and sent. */
+export const whatsappConfigured = () =>
+  Boolean(env.whatsappAccessToken && env.whatsappPhoneNumberId && env.whatsappAppSecret && env.whatsappVerifyToken);
 
 /** True when the admin area can sign people in (URL + publishable key). */
 export const authConfigured = () => Boolean(env.supabaseUrl && env.supabasePublishableKey);
