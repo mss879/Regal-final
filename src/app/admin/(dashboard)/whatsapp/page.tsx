@@ -35,7 +35,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
   const [listRes, detail] = await Promise.all([
     supabase
       .from("whatsapp_conversations")
-      .select("id, contact_id, profile_name, unread_count, last_preview, last_direction, last_inbound_at, last_message_at, created_at", { count: "exact" })
+      .select("id, contact_id, profile_name, unread_count, last_preview, last_direction, last_inbound_at, ai_paused_until, enquiry_id, last_message_at, created_at", { count: "exact" })
       .order("last_message_at", { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     selectedId
@@ -43,7 +43,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
           supabase.from("whatsapp_conversations").select("*").eq("id", selectedId).maybeSingle<WhatsAppConversation>(),
           supabase
             .from("whatsapp_messages")
-            .select("id, direction, message_type, content, status, error, created_at")
+            .select("id, direction, message_type, content, status, error, sent_by, created_at")
             .eq("conversation_id", selectedId)
             .order("id", { ascending: false })
             .limit(HISTORY),
@@ -64,7 +64,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
       <PageHeader
         eyebrow="WhatsApp"
         title="WhatsApp chat"
-        description="Messages sent to the business WhatsApp number appear here. Open a conversation to read it and reply. Replies go straight to the customer's WhatsApp."
+        description="Messages sent to the business WhatsApp number appear here. The AI assistant answers customers and books a call with the team. Open a conversation to read it or reply yourself, which pauses the AI for 8 hours."
       />
 
       {!whatsappConfigured() && (
@@ -95,6 +95,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
+                    {c.enquiry_id && <Badge tone="lime">Call requested</Badge>}
                     {c.unread_count > 0 && <Badge tone="design">{c.unread_count} new</Badge>}
                     {c.last_direction === "in" && c.unread_count === 0 && <Badge tone="neutral">Needs reply</Badge>}
                   </div>
@@ -134,10 +135,17 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
                 <Icon name="close" />
               </Link>
             </div>
-            <div className="flex justify-end border-b border-forest/10 px-6 py-3">
-              <DeleteWhatsAppButton conversationId={selected.id} closeHref={href({ id: null })} />
+            <div className="flex flex-wrap items-center gap-2 border-b border-forest/10 px-6 py-3">
+              {selected.enquiry_id && (
+                <Link href={`/admin/enquiries?tab=all&id=${selected.enquiry_id}` as Route} className={buttonClass("lime", "sm")}>
+                  <Icon name="inbox" className="size-4" /> Open the call request
+                </Link>
+              )}
+              <span className="ml-auto">
+                <DeleteWhatsAppButton conversationId={selected.id} closeHref={href({ id: null })} />
+              </span>
             </div>
-            <WhatsAppConsole key={selected.id} conversationId={selected.id} initialLines={lines} initialLastInboundAt={selected.last_inbound_at} />
+            <WhatsAppConsole key={selected.id} conversationId={selected.id} initialLines={lines} initialLastInboundAt={selected.last_inbound_at} initialAiPausedUntil={selected.ai_paused_until} />
           </aside>
         </div>
       )}

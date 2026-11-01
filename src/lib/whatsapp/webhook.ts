@@ -62,6 +62,9 @@ function describe(m: Json): string {
   return "[Message type not supported yet]";
 }
 
+/** Reactions, stickers and system notices don't need a reply from the AI. */
+export const shouldAnswer = (type: string) => !["reaction", "sticker", "system", "unsupported", "unknown"].includes(type);
+
 /** Flattens a webhook body into messages and delivery updates for our own number only. */
 export function parseWebhook(body: unknown, phoneNumberId: string): WebhookEvent[] {
   const events: WebhookEvent[] = [];

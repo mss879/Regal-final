@@ -13,7 +13,7 @@ export type Enquiry = {
   source_path: string | null;
   status: EnquiryStatus;
   lead_id: string | null;
-  channel: "form" | "chat";
+  channel: "form" | "chat" | "whatsapp";
   chat_session_id: string | null;
   created_at: string;
 };
@@ -43,6 +43,9 @@ export type WhatsAppConversation = {
   last_preview: string | null;
   last_direction: "in" | "out" | null;
   last_inbound_at: string | null;
+  /** The AI doesn't answer until this time (set by a staff reply or the switch). */
+  ai_paused_until: string | null;
+  enquiry_id: string | null;
   last_message_at: string;
   created_at: string;
 };
@@ -54,6 +57,7 @@ export type WhatsAppLine = {
   content: string;
   status: "received" | "sent" | "delivered" | "read" | "failed";
   error: string | null;
+  sent_by: "staff" | "ai" | null;
   created_at: string;
 };
 

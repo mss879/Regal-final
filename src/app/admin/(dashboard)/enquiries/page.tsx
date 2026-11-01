@@ -143,6 +143,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 text-[0.8rem] text-ink-2">
                     {e.channel === "chat" && <Badge tone="lime">AI chat</Badge>}
+                    {e.channel === "whatsapp" && <Badge tone="lime">WhatsApp</Badge>}
                     {e.lead_id && <Badge tone="forest">In CRM</Badge>}
                     {e.status === "archived" && <Badge tone={STATUS_TONE.archived}>Archived</Badge>}
                     {e.preferred_viewing_at && (
@@ -182,6 +183,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps<"/admin/
                   <Badge tone={INTEREST_TONE[current.interest] ?? "neutral"}>{interestLabel(current.interest)}</Badge>
                   {current.lead_id && <Badge tone="forest">In CRM</Badge>}
                   {current.channel === "chat" && <Badge tone="lime">Via AI chat</Badge>}
+                  {current.channel === "whatsapp" && <Badge tone="lime">Via WhatsApp</Badge>}
                 </div>
               </div>
               <Link href={href({ id: null })} scroll={false} className={buttonClass("ghost", "sm", "!px-2")} aria-label="Close">

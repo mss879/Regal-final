@@ -7,6 +7,7 @@ import { LOTS } from "@/lib/lots";
 import { SITE } from "@/lib/site";
 import { INTEREST_KEYS } from "@/lib/enquiry";
 import { buildSystemPrompt } from "@/lib/chat/knowledge";
+import { MODEL, modelSettings } from "@/lib/chat/model";
 import { clientIp, hashKey } from "@/lib/analytics/hash";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { formatDateTime, fromColombo } from "@/lib/time";
@@ -19,17 +20,6 @@ import { formatDateTime, fromColombo } from "@/lib/time";
 // call saveEnquiry, which writes to Enquiries (+ Viewings) in /admin.
 export const maxDuration = 30;
 
-// gpt-6-luna: OpenAI's most efficient model for focused, high-volume tasks ($0.10 / $0.50 per 1M
-// tokens in / out — cheaper than gpt-4o-mini). Override with OPENAI_MODEL.
-const MODEL = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
-
-// Reasoning models take a reasoning effort instead of a temperature. "none" keeps replies fast,
-// and gpt-6-luna only supports tool calling on Chat Completions with reasoning set to "none".
-function modelSettings(model: string) {
-  if (!/^(gpt-([5-9]|\d{2})|o\d)/.test(model)) return { temperature: 0.4 };
-  const effort = /^gpt-5(-|$)/.test(model) ? "minimal" : /^o\d/.test(model) || (/^gpt-6/.test(model) && !/^gpt-6-(luna|sol)$/.test(model)) ? "low" : "none";
-  return { providerOptions: { openai: { reasoningEffort: effort } } };
-}
 const MAX_BODY = 64_000;
 const HISTORY = 16; // messages sent to the model
 const HOUR = 3_600_000;

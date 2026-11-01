@@ -20,7 +20,7 @@ export async function deleteWhatsAppChat(conversationId: string): Promise<Action
   return { ok: true };
 }
 
-export type WhatsAppUpdate = { ok: true; lines: WhatsAppLine[]; lastInboundAt: string | null } | { ok: false; error: string };
+export type WhatsAppUpdate = { ok: true; lines: WhatsAppLine[]; lastInboundAt: string | null; aiPausedUntil: string | null } | { ok: false; error: string };
 
 /** The latest messages in a conversation (polled by the live console). Marks it as read. */
 export async function getWhatsAppUpdates(conversationId: string): Promise<WhatsAppUpdate> {
@@ -29,19 +29,28 @@ export async function getWhatsAppUpdates(conversationId: string): Promise<WhatsA
   const [lines, conversation] = await Promise.all([
     supabase
       .from("whatsapp_messages")
-      .select("id, direction, message_type, content, status, error, created_at")
+      .select("id, direction, message_type, content, status, error, sent_by, created_at")
       .eq("conversation_id", conversationId)
       .order("id", { ascending: false })
       .limit(HISTORY),
-    supabase.from("whatsapp_conversations").select("last_inbound_at, unread_count").eq("id", conversationId).maybeSingle(),
+    supabase.from("whatsapp_conversations").select("last_inbound_at, unread_count, ai_paused_until").eq("id", conversationId).maybeSingle(),
   ]);
   if (lines.error || conversation.error) return { ok: false, error: friendlyError(lines.error?.message ?? conversation.error?.message) };
   if (!conversation.data) return { ok: false, error: "This conversation no longer exists." };
   if (conversation.data.unread_count > 0) await supabase.rpc("mark_whatsapp_read", { p_conversation: conversationId });
-  return { ok: true, lines: ((lines.data ?? []) as WhatsAppLine[]).reverse(), lastInboundAt: conversation.data.last_inbound_at };
+  return { ok: true, lines: ((lines.data ?? []) as WhatsAppLine[]).reverse(), lastInboundAt: conversation.data.last_inbound_at, aiPausedUntil: conversation.data.ai_paused_until };
 }
 
-/** A staff reply: sent through WhatsApp first, then saved once WhatsApp has accepted it. */
+/** Switch the AI on, or off for the next 8 hours, for one conversation. */
+export async function setWhatsAppAi(conversationId: string, on: boolean): Promise<ActionResult> {
+  const { supabase } = await requireAdmin();
+  if (!uuid.safeParse(conversationId).success) return { ok: false, error: "Invalid request." };
+  const { error } = await supabase.rpc("set_whatsapp_ai", { p_conversation: conversationId, p_on: on });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  return { ok: true };
+}
+
+/** A staff reply: sent through WhatsApp first, then saved once WhatsApp has accepted it. It also pauses the AI. */
 export async function sendWhatsAppReply(conversationId: string, content: string): Promise<ActionResult> {
   const { supabase } = await requireAdmin();
   const text = content.trim();

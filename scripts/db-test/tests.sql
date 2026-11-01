@@ -380,5 +380,76 @@ begin
   raise notice 'ok: WhatsApp staff replies and delivery status';
 end $$;
 
+-- WhatsApp AI agent
+set role anon;
+do $$
+begin
+  perform public.save_whatsapp_enquiry(gen_random_uuid(), 'x', '0771234567', null, 'other', null);
+  raise exception 'FAIL: anon saved a WhatsApp enquiry';
+exception when insufficient_privilege then null;
+end $$;
+do $$
+begin
+  perform public.log_whatsapp_ai_reply(gen_random_uuid(), 'x', 'x');
+  raise exception 'FAIL: anon logged an AI reply';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+
+do $$
+declare
+  v_conversation uuid;
+  v_result jsonb;
+begin
+  perform public.log_whatsapp_inbound('94771112222', null, 'Nimal', 'wamid.ai1', 'text', 'Can someone call me?', now());
+  select id into v_conversation from public.whatsapp_conversations where contact_id = '94771112222';
+  perform public.log_whatsapp_ai_reply(v_conversation, 'wamid.ai2', 'Of course. May I have your name?');
+  assert (select sent_by from public.whatsapp_messages where wamid = 'wamid.ai2') = 'ai', 'AI reply labelled';
+  assert (select last_direction from public.whatsapp_conversations where id = v_conversation) = 'out', 'AI reply updates the conversation';
+
+  v_result := public.save_whatsapp_enquiry(v_conversation, 'Nimal Perera', null, null, 'other', null);
+  assert v_result->>'error' = 'missing_contact', 'a call request needs a number';
+  v_result := public.save_whatsapp_enquiry(v_conversation, 'Nimal Perera', '+94771112222', '9', 'pricing', 'Call back: tomorrow 5pm.');
+  assert (v_result->>'ok')::boolean and not (v_result->>'updated')::boolean, 'call request saved';
+  assert (select channel from public.enquiries where id = (v_result->>'id')::uuid) = 'whatsapp', 'enquiry marked as WhatsApp';
+  assert (select enquiry_id from public.whatsapp_conversations where id = v_conversation) = (v_result->>'id')::uuid, 'conversation linked to enquiry';
+  assert exists (select 1 from public.activity_log where summary like '%call request from Nimal Perera via WhatsApp%'), 'call request in the activity feed';
+  v_result := public.save_whatsapp_enquiry(v_conversation, 'Nimal Perera', null, 'any', null, 'Call back: Friday 10am.');
+  assert (v_result->>'updated')::boolean, 'a second save updates the same request';
+  assert (select count(*) from public.enquiries where channel = 'whatsapp') = 1, 'one request per conversation';
+  assert (select lot from public.enquiries where channel = 'whatsapp') = '9', 'blank details keep what was known';
+  assert (select phone from public.enquiries where channel = 'whatsapp') = '+94771112222', 'the number is kept';
+  raise notice 'ok: WhatsApp AI replies and call requests';
+end $$;
+
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+do $$
+begin
+  perform public.set_whatsapp_ai(gen_random_uuid(), false);
+  raise exception 'FAIL: non-admin switched the AI';
+exception when insufficient_privilege then null;
+end $$;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+do $$
+declare
+  v_conversation uuid := (select id from public.whatsapp_conversations where contact_id = '94771112222');
+begin
+  assert (select ai_paused_until from public.whatsapp_conversations where id = v_conversation) is null, 'the AI starts on';
+  perform public.log_whatsapp_reply(v_conversation, 'wamid.ai3', 'Hello Nimal, this is the sales team.');
+  assert (select ai_paused_until from public.whatsapp_conversations where id = v_conversation) > now() + interval '7 hours', 'a staff reply pauses the AI for 8 hours';
+  assert (select sent_by from public.whatsapp_messages where wamid = 'wamid.ai3') = 'staff', 'staff reply labelled';
+  perform public.set_whatsapp_ai(v_conversation, true);
+  assert (select ai_paused_until from public.whatsapp_conversations where id = v_conversation) is null, 'the switch turns the AI back on';
+  perform public.set_whatsapp_ai(v_conversation, false);
+  assert (select ai_paused_until from public.whatsapp_conversations where id = v_conversation) > now(), 'the switch pauses the AI';
+  delete from public.whatsapp_conversations where id = v_conversation;
+  assert (select count(*) from public.enquiries where channel = 'whatsapp') = 1, 'the call request survives deleting the chat';
+  raise notice 'ok: WhatsApp AI switch and staff takeover';
+end $$;
+reset role;
+reset request.jwt.claim.sub;
+
 select private.prune_old_data();
 \echo 'ALL DATABASE TESTS PASSED'

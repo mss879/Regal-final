@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
-import { getWhatsAppUpdates, sendWhatsAppReply } from "@/lib/admin/actions/whatsapp";
+import { getWhatsAppUpdates, sendWhatsAppReply, setWhatsAppAi } from "@/lib/admin/actions/whatsapp";
 import { formatTime } from "@/lib/time";
 import type { WhatsAppLine } from "@/lib/admin/types";
 import { buttonClass } from "@/components/admin/ui";
 import { Icon } from "@/components/admin/icons";
 
 const STATUS_LABEL: Record<WhatsAppLine["status"], string> = {
-  received: "Customer",
+  received: "",
   sent: "Sent",
   delivered: "Delivered",
   read: "Read",
@@ -16,18 +16,23 @@ const STATUS_LABEL: Record<WhatsAppLine["status"], string> = {
 };
 const REPLY_WINDOW = 24 * 60 * 60 * 1000;
 
-/** Live view of one WhatsApp conversation: new messages every 3 s and a reply box. */
+const SENDER = (m: WhatsAppLine) => (m.direction === "in" ? "Customer" : m.sent_by === "ai" ? "AI assistant" : "Staff");
+
+/** Live view of one WhatsApp conversation: new messages every 3 s, the AI switch and a reply box. */
 export function WhatsAppConsole({
   conversationId,
   initialLines,
   initialLastInboundAt,
+  initialAiPausedUntil,
 }: {
   conversationId: string;
   initialLines: WhatsAppLine[];
   initialLastInboundAt: string | null;
+  initialAiPausedUntil: string | null;
 }) {
   const [lines, setLines] = useState(initialLines);
   const [lastInboundAt, setLastInboundAt] = useState(initialLastInboundAt);
+  const [aiPausedUntil, setAiPausedUntil] = useState(initialAiPausedUntil);
   const [now, setNow] = useState(() => Date.now());
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string>();
@@ -44,6 +49,7 @@ export function WhatsAppConsole({
       if (!r.ok) return setError(r.error);
       setLines(r.lines);
       setLastInboundAt(r.lastInboundAt);
+      setAiPausedUntil(r.aiPausedUntil);
     };
     void poll();
     const timer = window.setInterval(poll, 3000);
@@ -60,6 +66,16 @@ export function WhatsAppConsole({
   const windowEnds = lastInboundAt ? new Date(lastInboundAt).getTime() + REPLY_WINDOW : 0;
   const canReply = windowEnds > now;
   const hoursLeft = Math.ceil((windowEnds - now) / 3_600_000);
+  const aiOn = !aiPausedUntil || new Date(aiPausedUntil).getTime() <= now;
+
+  const toggleAi = () =>
+    start(async () => {
+      setError(undefined);
+      const r = await setWhatsAppAi(conversationId, !aiOn);
+      if (!r.ok) return setError(r.error);
+      const u = await getWhatsAppUpdates(conversationId);
+      if (u.ok) setAiPausedUntil(u.aiPausedUntil);
+    });
 
   const send = () => {
     const text = draft.trim();
@@ -70,7 +86,10 @@ export function WhatsAppConsole({
       if (!r.ok) return setError(r.error);
       setDraft("");
       const u = await getWhatsAppUpdates(conversationId);
-      if (u.ok) setLines(u.lines);
+      if (u.ok) {
+        setLines(u.lines);
+        setAiPausedUntil(u.aiPausedUntil);
+      }
     });
   };
 
@@ -83,18 +102,41 @@ export function WhatsAppConsole({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-3 border-b border-forest/10 px-6 py-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={aiOn}
+          disabled={pending}
+          onClick={toggleAi}
+          className="group flex items-center gap-2.5 rounded-full border border-forest/15 py-1.5 pr-3.5 pl-1.5 text-[0.82rem] font-semibold text-forest transition-colors hover:border-forest/40 disabled:opacity-60"
+        >
+          <span className={`relative h-5 w-9 rounded-full transition-colors ${aiOn ? "bg-leaf" : "bg-forest/20"}`}>
+            <span className={`absolute top-0.5 size-4 rounded-full bg-paper shadow transition-transform ${aiOn ? "translate-x-[18px]" : "translate-x-0.5"}`} />
+          </span>
+          AI replies {aiOn ? "on" : "off"}
+        </button>
+        <span className="text-[0.78rem] text-ink-2">
+          {aiOn ? "The AI answers new messages. Your reply pauses it for 8 hours." : `Paused until ${formatTime(aiPausedUntil!)}, then the AI answers again.`}
+        </span>
+      </div>
+
       <ol ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5" aria-live="polite">
         {lines.map((m) => (
           <li key={m.id} className={m.direction === "in" ? "flex flex-col items-start" : "flex flex-col items-end"}>
             <p
               className={`max-w-[88%] rounded-[18px] px-4 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-wrap ${
-                m.direction === "in" ? "rounded-tl-md bg-cream text-forest" : "rounded-tr-md bg-forest text-paper"
+                m.direction === "in"
+                  ? "rounded-tl-md bg-cream text-forest"
+                  : m.sent_by === "ai"
+                    ? "rounded-tr-md border border-forest/10 bg-paper text-forest"
+                    : "rounded-tr-md bg-forest text-paper"
               }`}
             >
               {m.content}
             </p>
             <span className={`mt-1 px-1 text-[0.68rem] ${m.status === "failed" ? "text-sold" : "text-ink-2"}`}>
-              {STATUS_LABEL[m.status]} · {formatTime(m.created_at)}
+              {[SENDER(m), STATUS_LABEL[m.status], formatTime(m.created_at)].filter(Boolean).join(" · ")}
               {m.error ? ` · ${m.error}` : ""}
             </span>
           </li>

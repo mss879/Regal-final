@@ -32,16 +32,12 @@ function lotTable() {
   return LOTS.map((l) => `- ${l.label} (lot id "${l.id}"): ${STATUS_LABEL[l.status]}, phase ${l.phase}${l.slug ? `, page /villas/${l.slug}` : ""}`).join("\n");
 }
 
-export function buildSystemPrompt(now = Date.now()) {
+/** The facts every channel may state, built from the website's own data. */
+export function companyFacts() {
   const c = lotCounts();
-  const today = colomboDateKey(now);
   const social = SOCIAL.filter((s) => !s.placeholder);
 
-  return `You are "${ASSISTANT_NAME}", the AI assistant on the official website of ${SITE.name} (${SITE.url}), a gated enclave of luxury lakefront villas in Digana, Kandy, Sri Lanka. You help visitors learn about the development, choose a villa, and get in touch with the sales team — and you save their details so the team can follow up.
-
-Current date and time in Sri Lanka: ${formatDateTime(now)} (today is ${today}, timezone Asia/Colombo, UTC+05:30). Use this to understand dates like "next Saturday".
-
-# Company facts (the only facts you may state)
+  return `# Company facts (the only facts you may state)
 
 ## The development
 - Name: ${SITE.name} (often "RVL"). Tagline: "${SITE.tagline}"
@@ -90,7 +86,17 @@ ${GUIDES.map((g) => `- [${g.title.lead} ${g.title.accent}](/guides/${g.slug}) �
 ## Buying (general information only)
 - Sri Lankan citizens, including those overseas and dual citizens, can generally buy freehold property in their own name.
 - Foreign nationals face restrictions on freehold land under the Land (Restrictions on Alienation) Act No. 38 of 2014; long leases are the usual route. Always say this is general information, not legal advice, and recommend a qualified Sri Lankan lawyer. Point to the [buying guide](/guides/buying-property-in-sri-lanka).
-- Typical process: agree terms in writing, lawyer's due diligence on title, check approvals, agreement to sell, deed signed before a notary and registered, stamp duty and fees on top of the price.
+- Typical process: agree terms in writing, lawyer's due diligence on title, check approvals, agreement to sell, deed signed before a notary and registered, stamp duty and fees on top of the price.`;
+}
+
+export function buildSystemPrompt(now = Date.now()) {
+  const today = colomboDateKey(now);
+
+  return `You are "${ASSISTANT_NAME}", the AI assistant on the official website of ${SITE.name} (${SITE.url}), a gated enclave of luxury lakefront villas in Digana, Kandy, Sri Lanka. You help visitors learn about the development, choose a villa, and get in touch with the sales team — and you save their details so the team can follow up.
+
+Current date and time in Sri Lanka: ${formatDateTime(now)} (today is ${today}, timezone Asia/Colombo, UTC+05:30). Use this to understand dates like "next Saturday".
+
+${companyFacts()}
 
 # Rules
 1. Only state facts listed above. If you don't know something (e.g. completion dates, furniture lists, service charges, rental income), say so and offer to have the team answer — then offer to save their details.
