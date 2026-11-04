@@ -4,17 +4,15 @@ import { requireAdmin } from "@/lib/auth/dal";
 import { whatsappConfigured } from "@/lib/env";
 import { nowMs } from "@/lib/admin/now";
 import { formatDateTime, relativeTime } from "@/lib/time";
-import type { WhatsAppConversation, WhatsAppLine } from "@/lib/admin/types";
+import type { WhatsAppConversation } from "@/lib/admin/types";
 import { Badge, Card, EmptyState, PageHeader, buttonClass } from "@/components/admin/ui";
 import { Icon } from "@/components/admin/icons";
-import { AutoRefresh } from "@/components/admin/AutoRefresh";
-import { DeleteWhatsAppButton } from "@/components/admin/whatsapp/DeleteWhatsAppButton";
-import { WhatsAppConsole } from "@/components/admin/whatsapp/WhatsAppConsole";
+import { DrawerAutoRefresh, DrawerLink, DrawerProvider } from "@/components/admin/drawer";
+import { WhatsAppDrawer, type WhatsAppSummary } from "@/components/admin/whatsapp/WhatsAppDrawer";
 
 export const metadata: Metadata = { title: "WhatsApp chat" };
 
 const PAGE_SIZE = 30;
-const HISTORY = 200;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const contactNumber = (c: Pick<WhatsAppConversation, "contact_id">) => (/^\d+$/.test(c.contact_id) ? `+${c.contact_id}` : "Number hidden");
@@ -32,35 +30,38 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
     return `/admin/whatsapp${s.size ? `?${s}` : ""}` as Route;
   };
 
-  const [listRes, detail] = await Promise.all([
+  // The drawer opens in the browser and loads messages from /admin/api/whatsapp.
+  const COLUMNS = "id, contact_id, profile_name, unread_count, last_preview, last_direction, last_inbound_at, ai_paused_until, enquiry_id, last_message_at, created_at";
+  const [listRes, linked] = await Promise.all([
     supabase
       .from("whatsapp_conversations")
-      .select("id, contact_id, profile_name, unread_count, last_preview, last_direction, last_inbound_at, ai_paused_until, enquiry_id, last_message_at, created_at", { count: "exact" })
+      .select(COLUMNS, { count: "exact" })
       .order("last_message_at", { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
-    selectedId
-      ? Promise.all([
-          supabase.from("whatsapp_conversations").select("*").eq("id", selectedId).maybeSingle<WhatsAppConversation>(),
-          supabase
-            .from("whatsapp_messages")
-            .select("id, direction, message_type, content, status, error, sent_by, created_at")
-            .eq("conversation_id", selectedId)
-            .order("id", { ascending: false })
-            .limit(HISTORY),
-        ])
-      : null,
+    // A conversation opened from a link, which may not be on this page of the list.
+    selectedId ? supabase.from("whatsapp_conversations").select(COLUMNS).eq("id", selectedId).maybeSingle<WhatsAppConversation>() : null,
   ]);
   if (listRes.error) throw new Error(listRes.error.message);
   const conversations = (listRes.data ?? []) as WhatsAppConversation[];
   const total = listRes.count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const selected = detail?.[0].data ?? null;
-  const lines = ((detail?.[1].data ?? []) as WhatsAppLine[]).reverse();
+  const summaries: Record<string, WhatsAppSummary> = {};
+  for (const c of [...conversations, ...(linked?.data ? [linked.data] : [])]) {
+    summaries[c.id] = {
+      id: c.id,
+      title: c.profile_name ?? contactNumber(c),
+      number: contactNumber(c),
+      enquiryId: c.enquiry_id,
+      createdAt: c.created_at,
+      lastInboundAt: c.last_inbound_at,
+      aiPausedUntil: c.ai_paused_until,
+    };
+  }
   const now = nowMs();
 
   return (
-    <>
-      {!selected && <AutoRefresh seconds={10} />}
+    <DrawerProvider kind="whatsapp">
+      <DrawerAutoRefresh seconds={10} />
       <PageHeader
         eyebrow="WhatsApp"
         title="WhatsApp chat"
@@ -82,9 +83,9 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
           <ul className="divide-y divide-forest/10">
             {conversations.map((c) => (
               <li key={c.id}>
-                <Link
+                <DrawerLink
+                  id={c.id}
                   href={href({ id: c.id })}
-                  aria-current={c.id === selectedId ? "true" : undefined}
                   className="grid gap-2 px-5 py-4 transition-colors hover:bg-cream/70 aria-[current=true]:bg-lime/25 md:grid-cols-[minmax(0,2fr)_auto_auto] md:items-center md:gap-6"
                 >
                   <div className="min-w-0">
@@ -102,7 +103,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
                   <time dateTime={c.last_message_at} title={formatDateTime(c.last_message_at)} className="text-[0.8rem] whitespace-nowrap text-ink-2 md:text-right">
                     {relativeTime(c.last_message_at, now)}
                   </time>
-                </Link>
+                </DrawerLink>
               </li>
             ))}
           </ul>
@@ -119,36 +120,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/admin/w
         </nav>
       )}
 
-      {selected && (
-        <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-labelledby="whatsapp-title">
-          <Link href={href({ id: null })} scroll={false} className="absolute inset-0 bg-forest/40 backdrop-blur-[2px]" aria-label="Close chat" />
-          <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-paper shadow-2xl sm:inset-y-3 sm:right-3 sm:rounded-[28px]">
-            <div className="flex items-start justify-between gap-4 border-b border-forest/10 p-6">
-              <div className="min-w-0">
-                <p className="eyebrow text-leaf">WhatsApp · since {formatDateTime(selected.created_at)}</p>
-                <h2 id="whatsapp-title" className="mt-2 truncate font-display text-2xl font-light text-forest uppercase">
-                  {selected.profile_name ?? contactNumber(selected)}
-                </h2>
-                <p className="mt-1 text-[0.8rem] text-ink-2">{contactNumber(selected)}</p>
-              </div>
-              <Link href={href({ id: null })} scroll={false} className={buttonClass("ghost", "sm", "!px-2")} aria-label="Close">
-                <Icon name="close" />
-              </Link>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-b border-forest/10 px-6 py-3">
-              {selected.enquiry_id && (
-                <Link href={`/admin/enquiries?tab=all&id=${selected.enquiry_id}` as Route} className={buttonClass("lime", "sm")}>
-                  <Icon name="inbox" className="size-4" /> Open the call request
-                </Link>
-              )}
-              <span className="ml-auto">
-                <DeleteWhatsAppButton conversationId={selected.id} closeHref={href({ id: null })} />
-              </span>
-            </div>
-            <WhatsAppConsole key={selected.id} conversationId={selected.id} initialLines={lines} initialLastInboundAt={selected.last_inbound_at} initialAiPausedUntil={selected.ai_paused_until} />
-          </aside>
-        </div>
-      )}
-    </>
+      <WhatsAppDrawer summaries={summaries} />
+    </DrawerProvider>
   );
 }

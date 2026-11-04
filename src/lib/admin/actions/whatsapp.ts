@@ -3,11 +3,10 @@
 import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/dal";
-import { friendlyError, type ActionResult, type WhatsAppConversation, type WhatsAppLine } from "@/lib/admin/types";
+import { friendlyError, type ActionResult, type WhatsAppConversation } from "@/lib/admin/types";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
 
 const uuid = z.uuid();
-const HISTORY = 200;
 const REPLY_WINDOW = 24 * 60 * 60 * 1000;
 
 /** Deletes a conversation and its messages from the website. WhatsApp itself is not affected. */
@@ -18,27 +17,6 @@ export async function deleteWhatsAppChat(conversationId: string): Promise<Action
   if (error) return { ok: false, error: friendlyError(error.message) };
   refresh();
   return { ok: true };
-}
-
-export type WhatsAppUpdate = { ok: true; lines: WhatsAppLine[]; lastInboundAt: string | null; aiPausedUntil: string | null } | { ok: false; error: string };
-
-/** The latest messages in a conversation (polled by the live console). Marks it as read. */
-export async function getWhatsAppUpdates(conversationId: string): Promise<WhatsAppUpdate> {
-  const { supabase } = await requireAdmin();
-  if (!uuid.safeParse(conversationId).success) return { ok: false, error: "Invalid request." };
-  const [lines, conversation] = await Promise.all([
-    supabase
-      .from("whatsapp_messages")
-      .select("id, direction, message_type, content, status, error, sent_by, created_at")
-      .eq("conversation_id", conversationId)
-      .order("id", { ascending: false })
-      .limit(HISTORY),
-    supabase.from("whatsapp_conversations").select("last_inbound_at, unread_count, ai_paused_until").eq("id", conversationId).maybeSingle(),
-  ]);
-  if (lines.error || conversation.error) return { ok: false, error: friendlyError(lines.error?.message ?? conversation.error?.message) };
-  if (!conversation.data) return { ok: false, error: "This conversation no longer exists." };
-  if (conversation.data.unread_count > 0) await supabase.rpc("mark_whatsapp_read", { p_conversation: conversationId });
-  return { ok: true, lines: ((lines.data ?? []) as WhatsAppLine[]).reverse(), lastInboundAt: conversation.data.last_inbound_at, aiPausedUntil: conversation.data.ai_paused_until };
 }
 
 /** Switch the AI on, or off for the next 8 hours, for one conversation. */

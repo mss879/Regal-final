@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
-import { getChatUpdates, sendChatReply, setChatAi } from "@/lib/admin/actions/chats";
+import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
+import { sendChatReply, setChatAi } from "@/lib/admin/actions/chats";
 import { formatTime, relativeTime } from "@/lib/time";
 import type { ChatLine } from "@/lib/admin/types";
 import { buttonClass } from "@/components/admin/ui";
 import { Icon } from "@/components/admin/icons";
+import { fetchThread, peekThread, prefetchThread, rememberThread } from "@/components/admin/thread-cache";
+import { ThreadSkeleton } from "@/components/admin/drawer";
 
 const ROLE_LABEL: Record<ChatLine["role"], string> = { user: "Visitor", assistant: "AI assistant", agent: "Staff" };
+const POLL_MS = 3000;
+
+type Thread = { lines: ChatLine[]; aiPaused: boolean; visitorSeenAt: string | null };
+
+const merge = (prev: ChatLine[], next: ChatLine[]) => (next.length ? [...prev, ...next.filter((l) => !prev.some((p) => p.id === l.id))] : prev);
 
 /**
  * Live view of one chat: new messages every 3 s, the AI on/off switch, and a reply box.
@@ -15,46 +22,67 @@ const ROLE_LABEL: Record<ChatLine["role"], string> = { user: "Visitor", assistan
  */
 export function ChatConsole({
   sessionId,
-  initialLines,
   initialPaused,
   initialSeenAt,
 }: {
   sessionId: string;
-  initialLines: ChatLine[];
   initialPaused: boolean;
   initialSeenAt: string | null;
 }) {
-  const [lines, setLines] = useState(initialLines);
-  const [paused, setPaused] = useState(initialPaused);
-  const [seenAt, setSeenAt] = useState(initialSeenAt);
+  const [cached] = useState(() => peekThread<Thread>("chats", sessionId));
+  const [lines, setLines] = useState<ChatLine[] | null>(cached?.lines ?? null);
+  const [paused, setPaused] = useState(cached?.aiPaused ?? initialPaused);
+  const [seenAt, setSeenAt] = useState(cached?.visitorSeenAt ?? initialSeenAt);
   const [now, setNow] = useState(() => Date.now());
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const listRef = useRef<HTMLOListElement>(null);
-  const lastId = lines.length ? lines[lines.length - 1].id : 0;
+  const linesRef = useRef(lines);
+
+  // Pull anything newer than the last message we have; the first call loads the whole chat.
+  const pull = useCallback(async () => {
+    const have = linesRef.current;
+    const r = have
+      ? await fetchThread<Thread>("chats", sessionId, `?after=${have.length ? have[have.length - 1].id : 0}`)
+      : await prefetchThread<Thread>("chats", sessionId);
+    const next = have ? merge(have, r.lines) : r.lines;
+    linesRef.current = next;
+    rememberThread("chats", sessionId, { ok: true, lines: next, aiPaused: r.aiPaused, visitorSeenAt: r.visitorSeenAt });
+    setLines(next);
+    setPaused(r.aiPaused);
+    setSeenAt(r.visitorSeenAt);
+    setNow(Date.now());
+    setError(undefined);
+  }, [sessionId]);
 
   useEffect(() => {
     let stopped = false;
-    const timer = window.setInterval(async () => {
-      if (document.visibilityState !== "visible") return;
-      const r = await getChatUpdates(sessionId, lastId);
-      if (stopped) return;
-      setNow(Date.now());
-      if (!r.ok) return setError(r.error);
-      setPaused(r.aiPaused);
-      setSeenAt(r.visitorSeenAt);
-      if (r.lines.length) setLines((prev) => [...prev, ...r.lines.filter((l) => !prev.some((p) => p.id === l.id))]);
-    }, 3000);
+    let timer = 0;
+    const loop = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          await pull();
+        } catch (err) {
+          if (!stopped) setError(err instanceof Error ? err.message : "Couldn't load new messages.");
+        }
+      }
+      if (!stopped) timer = window.setTimeout(loop, POLL_MS);
+    };
+    void loop();
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, [sessionId, lastId]);
+  }, [pull]);
 
+  // Jump to the newest message on open, then scroll smoothly as new ones arrive.
+  const scrolled = useRef(false);
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [lines.length]);
+    if (!lines?.length) return;
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: scrolled.current ? "smooth" : "auto" });
+    scrolled.current = true;
+  }, [lines?.length]);
 
   const toggleAi = () =>
     start(async () => {
@@ -73,8 +101,7 @@ export function ChatConsole({
       if (!r.ok) return setError(r.error);
       setDraft("");
       setPaused(true);
-      const u = await getChatUpdates(sessionId, lastId);
-      if (u.ok) setLines((prev) => [...prev, ...u.lines.filter((l) => !prev.some((p) => p.id === l.id))]);
+      await pull().catch(() => {});
     });
   };
 
@@ -110,7 +137,9 @@ export function ChatConsole({
       </div>
 
       <ol ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5" aria-live="polite">
-        {lines.map((m) => (
+        {lines === null && <ThreadSkeleton />}
+        {lines?.length === 0 && <li className="py-10 text-center text-[0.85rem] text-ink-2">No messages in this chat yet.</li>}
+        {lines?.map((m) => (
           <li key={m.id} className={m.role === "user" ? "flex flex-col items-start" : "flex flex-col items-end"}>
             <p
               className={`max-w-[88%] rounded-[18px] px-4 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-wrap ${
@@ -157,3 +186,4 @@ export function ChatConsole({
     </div>
   );
 }
+

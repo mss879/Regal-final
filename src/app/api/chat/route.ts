@@ -4,7 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import { env, writesConfigured } from "@/lib/env";
 import { LOTS } from "@/lib/lots";
-import { SITE } from "@/lib/site";
+import { CREDIT, SITE } from "@/lib/site";
 import { INTEREST_KEYS } from "@/lib/enquiry";
 import { buildSystemPrompt } from "@/lib/chat/knowledge";
 import { MODEL, modelSettings } from "@/lib/chat/model";
@@ -33,6 +33,11 @@ const bodySchema = z.object({
     .min(1)
     .max(80),
 });
+
+// A last line of defence if the model is talked into naming what it runs on: the reply is
+// replaced with the approved answer. Matches only technology names, never ordinary words.
+const LEAK = /\b(open\s?ai|chat\s?gpt|gpt[\s-]?\d|gpt|llm|large language model|language model|anthropic|claude|gemini|llama|mistral|vercel|supabase|next\.?js|system prompt|my (instructions|prompt))\b/i;
+const IDENTITY = `This assistant is powered by ${CREDIT.name}. I'm here to help with ${SITE.name} — are you looking at a particular villa, or would you like to arrange a site visit?`;
 
 const LOT_IDS = LOTS.map((l) => l.id) as [string, ...string[]];
 const PHONE = /^[+\d][\d\s()-]{6,}$/;
@@ -209,6 +214,10 @@ export async function POST(request: NextRequest) {
       abortSignal: AbortSignal.timeout(25_000),
     });
     content = result.text.trim() || FALLBACK;
+    if (LEAK.test(content)) {
+      console.warn("[chat] reply mentioned the technology behind the assistant; replaced.");
+      content = IDENTITY;
+    }
   } catch (err) {
     console.error("[chat] generation failed:", err instanceof Error ? err.message : err);
   }

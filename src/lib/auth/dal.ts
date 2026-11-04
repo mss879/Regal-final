@@ -20,18 +20,36 @@ type Session =
 export const getSession = cache(async (): Promise<Session> => {
   if (!authConfigured()) return { status: "unconfigured" };
   const supabase = await createClient();
+  // The user id in the session cookie (unverified) lets the admin_users lookup run alongside
+  // getUser() instead of after it, saving a round trip on every admin page, poll and action.
+  // RLS still checks the real token, and the ids are compared below.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const claimedId = tokenSubject(session?.access_token);
+  const lookup = (id: string) =>
+    supabase.from("admin_users").select("user_id, email, full_name").eq("user_id", id).maybeSingle<AdminProfile>();
+  const [
+    {
+      data: { user },
+    },
+    early,
+  ] = await Promise.all([supabase.auth.getUser(), claimedId ? lookup(claimedId) : null]);
   if (!user) return { status: "signed-out" };
-  const { data: admin } = await supabase
-    .from("admin_users")
-    .select("user_id, email, full_name")
-    .eq("user_id", user.id)
-    .maybeSingle<AdminProfile>();
+  const admin = user.id === claimedId ? early?.data : (await lookup(user.id)).data;
   if (!admin) return { status: "forbidden", user };
   return { status: "admin", user, admin, supabase };
 });
+
+/** The "sub" claim of a JWT, without verifying it (getUser() does that). */
+function tokenSubject(token: string | undefined) {
+  try {
+    const sub = token ? JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()).sub : null;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Use at the top of every admin page and every admin Server Action. Redirects anyone who

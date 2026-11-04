@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
-import { getWhatsAppUpdates, sendWhatsAppReply, setWhatsAppAi } from "@/lib/admin/actions/whatsapp";
+import { useCallback, useEffect, useRef, useState, useTransition, type KeyboardEvent } from "react";
+import { sendWhatsAppReply, setWhatsAppAi } from "@/lib/admin/actions/whatsapp";
 import { formatTime } from "@/lib/time";
 import type { WhatsAppLine } from "@/lib/admin/types";
 import { buttonClass } from "@/components/admin/ui";
 import { Icon } from "@/components/admin/icons";
+import { ThreadSkeleton } from "@/components/admin/drawer";
+import { fetchThread, peekThread, prefetchThread, rememberThread } from "@/components/admin/thread-cache";
 
 const STATUS_LABEL: Record<WhatsAppLine["status"], string> = {
   received: "",
@@ -15,53 +17,72 @@ const STATUS_LABEL: Record<WhatsAppLine["status"], string> = {
   failed: "Not delivered",
 };
 const REPLY_WINDOW = 24 * 60 * 60 * 1000;
+const POLL_MS = 3000;
+
+type Thread = { lines: WhatsAppLine[]; lastInboundAt: string | null; aiPausedUntil: string | null };
 
 const SENDER = (m: WhatsAppLine) => (m.direction === "in" ? "Customer" : m.sent_by === "ai" ? "AI assistant" : "Staff");
 
 /** Live view of one WhatsApp conversation: new messages every 3 s, the AI switch and a reply box. */
 export function WhatsAppConsole({
   conversationId,
-  initialLines,
   initialLastInboundAt,
   initialAiPausedUntil,
 }: {
   conversationId: string;
-  initialLines: WhatsAppLine[];
   initialLastInboundAt: string | null;
   initialAiPausedUntil: string | null;
 }) {
-  const [lines, setLines] = useState(initialLines);
-  const [lastInboundAt, setLastInboundAt] = useState(initialLastInboundAt);
-  const [aiPausedUntil, setAiPausedUntil] = useState(initialAiPausedUntil);
+  const [cached] = useState(() => peekThread<Thread>("whatsapp", conversationId));
+  const [lines, setLines] = useState<WhatsAppLine[] | null>(cached?.lines ?? null);
+  const [lastInboundAt, setLastInboundAt] = useState(cached?.lastInboundAt ?? initialLastInboundAt);
+  const [aiPausedUntil, setAiPausedUntil] = useState(cached?.aiPausedUntil ?? initialAiPausedUntil);
   const [now, setNow] = useState(() => Date.now());
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const listRef = useRef<HTMLOListElement>(null);
+  const loaded = useRef(Boolean(cached));
 
-  useEffect(() => {
-    let stopped = false;
-    const poll = async () => {
-      if (document.visibilityState !== "visible") return;
-      const r = await getWhatsAppUpdates(conversationId);
-      if (stopped) return;
-      setNow(Date.now());
-      if (!r.ok) return setError(r.error);
-      setLines(r.lines);
-      setLastInboundAt(r.lastInboundAt);
-      setAiPausedUntil(r.aiPausedUntil);
-    };
-    void poll();
-    const timer = window.setInterval(poll, 3000);
-    return () => {
-      stopped = true;
-      window.clearInterval(timer);
-    };
+  // The latest messages (statuses change too, so the recent history is re-read each time).
+  const pull = useCallback(async () => {
+    const r = loaded.current ? await fetchThread<Thread>("whatsapp", conversationId) : await prefetchThread<Thread>("whatsapp", conversationId);
+    loaded.current = true;
+    rememberThread("whatsapp", conversationId, r);
+    setLines(r.lines);
+    setLastInboundAt(r.lastInboundAt);
+    setAiPausedUntil(r.aiPausedUntil);
+    setNow(Date.now());
+    setError(undefined);
   }, [conversationId]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [lines.length]);
+    let stopped = false;
+    let timer = 0;
+    const loop = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          await pull();
+        } catch (err) {
+          if (!stopped) setError(err instanceof Error ? err.message : "Couldn't load new messages.");
+        }
+      }
+      if (!stopped) timer = window.setTimeout(loop, POLL_MS);
+    };
+    void loop();
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [pull]);
+
+  // Jump to the newest message on open, then scroll smoothly as new ones arrive.
+  const scrolled = useRef(false);
+  useEffect(() => {
+    if (!lines?.length) return;
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: scrolled.current ? "smooth" : "auto" });
+    scrolled.current = true;
+  }, [lines?.length]);
 
   const windowEnds = lastInboundAt ? new Date(lastInboundAt).getTime() + REPLY_WINDOW : 0;
   const canReply = windowEnds > now;
@@ -73,8 +94,7 @@ export function WhatsAppConsole({
       setError(undefined);
       const r = await setWhatsAppAi(conversationId, !aiOn);
       if (!r.ok) return setError(r.error);
-      const u = await getWhatsAppUpdates(conversationId);
-      if (u.ok) setAiPausedUntil(u.aiPausedUntil);
+      await pull().catch(() => {});
     });
 
   const send = () => {
@@ -85,11 +105,7 @@ export function WhatsAppConsole({
       const r = await sendWhatsAppReply(conversationId, text);
       if (!r.ok) return setError(r.error);
       setDraft("");
-      const u = await getWhatsAppUpdates(conversationId);
-      if (u.ok) {
-        setLines(u.lines);
-        setAiPausedUntil(u.aiPausedUntil);
-      }
+      await pull().catch(() => {});
     });
   };
 
@@ -122,7 +138,8 @@ export function WhatsAppConsole({
       </div>
 
       <ol ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-6 py-5" aria-live="polite">
-        {lines.map((m) => (
+        {lines === null && <ThreadSkeleton />}
+        {lines?.map((m) => (
           <li key={m.id} className={m.direction === "in" ? "flex flex-col items-start" : "flex flex-col items-end"}>
             <p
               className={`max-w-[88%] rounded-[18px] px-4 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-wrap ${

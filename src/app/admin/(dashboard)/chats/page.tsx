@@ -3,12 +3,11 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/dal";
 import { nowMs } from "@/lib/admin/now";
 import { formatDateTime, relativeTime } from "@/lib/time";
-import type { ChatLine, ChatSession, Enquiry } from "@/lib/admin/types";
+import type { ChatSession } from "@/lib/admin/types";
 import { Badge, Card, EmptyState, PageHeader, buttonClass } from "@/components/admin/ui";
 import { Icon } from "@/components/admin/icons";
-import { DeleteChatButton } from "@/components/admin/chats/DeleteChatButton";
-import { ChatConsole } from "@/components/admin/chats/ChatConsole";
-import { AutoRefresh } from "@/components/admin/AutoRefresh";
+import { DrawerAutoRefresh, DrawerLink, DrawerProvider } from "@/components/admin/drawer";
+import { ChatDrawer, type ChatSummary } from "@/components/admin/chats/ChatDrawer";
 
 export const metadata: Metadata = { title: "AI chats" };
 
@@ -29,47 +28,54 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
     return `/admin/chats${s.size ? `?${s}` : ""}` as Route;
   };
 
-  let list = supabase
-    .from("chat_sessions")
-    .select("id, started_path, message_count, enquiry_id, ai_paused, last_role, visitor_seen_at, created_at, last_message_at", { count: "exact" })
+  // One query: the page of chats, each with its enquiry's name and first visitor message.
+  // The drawer opens in the browser and loads messages from /admin/api/chats.
+  const COLUMNS =
+    "id, started_path, message_count, enquiry_id, ai_paused, last_role, visitor_seen_at, created_at, last_message_at, enquiry:enquiries!chat_sessions_enquiry_id_fkey(name), preview:chat_messages(content)";
+  type Row = ChatSession & { enquiry: { name: string } | null; preview: { content: string }[] };
+  const query = () =>
+    supabase
+      .from("chat_sessions")
+      .select(COLUMNS, { count: "exact" })
+      .eq("preview.role", "user")
+      .order("id", { referencedTable: "preview" })
+      .limit(1, { referencedTable: "preview" });
+
+  let list = query()
     .order("last_message_at", { ascending: false })
     .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
   if (leadsOnly) list = list.not("enquiry_id", "is", null);
 
-  const [listRes, detail] = await Promise.all([
+  const [listRes, linked] = await Promise.all([
     list,
-    selectedId
-      ? Promise.all([
-          supabase.from("chat_sessions").select("*").eq("id", selectedId).maybeSingle<ChatSession>(),
-          supabase.from("chat_messages").select("id, role, content, created_at").eq("session_id", selectedId).order("created_at").order("id"),
-        ])
-      : null,
+    // A chat opened from a link (e.g. on an enquiry), which may not be on this page of the list.
+    selectedId ? query().eq("id", selectedId).maybeSingle() : null,
   ]);
   if (listRes.error) throw new Error(listRes.error.message);
-  const sessions = (listRes.data ?? []) as ChatSession[];
+  const sessions = (listRes.data ?? []) as unknown as Row[];
   const total = listRes.count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // First visitor message of each listed chat, as a preview.
-  const ids = sessions.map((s) => s.id);
-  const enquiryIds = sessions.map((s) => s.enquiry_id).filter((v): v is string => Boolean(v));
-  const selected = detail?.[0].data ?? null;
-  const lines = (detail?.[1].data ?? []) as ChatLine[];
-  if (selected?.enquiry_id) enquiryIds.push(selected.enquiry_id);
-  const [previewRes, enquiryRes] = await Promise.all([
-    ids.length ? supabase.from("chat_messages").select("session_id, content, created_at").in("session_id", ids).eq("role", "user").order("created_at") : null,
-    enquiryIds.length ? supabase.from("enquiries").select("id, name, email, phone").in("id", enquiryIds) : null,
-  ]);
-  const previews: Record<string, string> = {};
-  for (const m of previewRes?.data ?? []) previews[m.session_id] ??= m.content;
-  const enquiries = Object.fromEntries(((enquiryRes?.data ?? []) as Pick<Enquiry, "id" | "name" | "email" | "phone">[]).map((e) => [e.id, e]));
+  const summaries: Record<string, ChatSummary> = {};
+  for (const s of [...sessions, ...(linked?.data ? [linked.data as unknown as Row] : [])]) {
+    summaries[s.id] = {
+      id: s.id,
+      name: s.enquiry?.name ?? null,
+      enquiryId: s.enquiry_id,
+      messageCount: s.message_count,
+      startedPath: s.started_path,
+      createdAt: s.created_at,
+      aiPaused: s.ai_paused,
+      visitorSeenAt: s.visitor_seen_at,
+    };
+  }
   const now = nowMs();
   const live = (s: ChatSession) =>
     (s.visitor_seen_at && now - new Date(s.visitor_seen_at).getTime() < 120_000) || now - new Date(s.last_message_at).getTime() < 180_000;
 
   return (
-    <>
-      {!selected && <AutoRefresh seconds={10} />}
+    <DrawerProvider kind="chats">
+      <DrawerAutoRefresh seconds={10} />
       <PageHeader
         eyebrow="AI assistant"
         title="AI chats"
@@ -100,18 +106,19 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
         ) : (
           <ul className="divide-y divide-forest/10">
             {sessions.map((s) => {
-              const enquiry = s.enquiry_id ? enquiries[s.enquiry_id] : null;
+              const enquiry = s.enquiry;
+              const preview = s.preview[0]?.content;
               return (
                 <li key={s.id}>
-                  <Link
+                  <DrawerLink
+                    id={s.id}
                     href={href({ id: s.id })}
-                    aria-current={s.id === selectedId ? "true" : undefined}
                     className="grid gap-2 px-5 py-4 transition-colors hover:bg-cream/70 aria-[current=true]:bg-lime/25 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] md:items-center md:gap-6"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-forest">{enquiry?.name ?? (previews[s.id] ? `“${previews[s.id]}”` : "Conversation")}</p>
+                      <p className="truncate font-semibold text-forest">{enquiry?.name ?? (preview ? `“${preview}”` : "Conversation")}</p>
                       <p className="truncate text-[0.82rem] text-ink-2">
-                        {enquiry ? `“${previews[s.id] ?? ""}”` : `${s.message_count} messages`}
+                        {enquiry ? `“${preview ?? ""}”` : `${s.message_count} messages`}
                         {s.started_path ? ` · started on ${s.started_path}` : ""}
                       </p>
                     </div>
@@ -128,7 +135,7 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
                     <time dateTime={s.last_message_at} title={formatDateTime(s.last_message_at)} className="text-[0.8rem] whitespace-nowrap text-ink-2 md:text-right">
                       {relativeTime(s.last_message_at, now)}
                     </time>
-                  </Link>
+                  </DrawerLink>
                 </li>
               );
             })}
@@ -146,46 +153,7 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
         </nav>
       )}
 
-      {selected && (
-        <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-labelledby="chat-title">
-          <Link href={href({ id: null })} scroll={false} className="absolute inset-0 bg-forest/40 backdrop-blur-[2px]" aria-label="Close chat" />
-          <aside className="absolute inset-y-0 right-0 flex w-full max-w-xl flex-col bg-paper shadow-2xl sm:inset-y-3 sm:right-3 sm:rounded-[28px]">
-            <div className="flex items-start justify-between gap-4 border-b border-forest/10 p-6">
-              <div className="min-w-0">
-                <p className="eyebrow text-leaf">Chat · {formatDateTime(selected.created_at)}</p>
-                <h2 id="chat-title" className="mt-2 truncate font-display text-2xl font-light text-forest uppercase">
-                  {selected.enquiry_id && enquiries[selected.enquiry_id] ? enquiries[selected.enquiry_id].name : "Website visitor"}
-                </h2>
-                <p className="mt-1 text-[0.8rem] text-ink-2">
-                  {selected.message_count} messages{selected.started_path ? ` · started on ${selected.started_path}` : ""}
-                </p>
-              </div>
-              <Link href={href({ id: null })} scroll={false} className={buttonClass("ghost", "sm", "!px-2")} aria-label="Close">
-                <Icon name="close" />
-              </Link>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-b border-forest/10 px-6 py-3">
-              {selected.enquiry_id ? (
-                <Link href={`/admin/enquiries?tab=all&id=${selected.enquiry_id}` as Route} className={buttonClass("lime", "sm")}>
-                  <Icon name="inbox" className="size-4" /> Open the enquiry
-                </Link>
-              ) : (
-                <span className="text-[0.82rem] text-ink-2">No contact details were saved in this chat.</span>
-              )}
-              <span className="ml-auto">
-                <DeleteChatButton sessionId={selected.id} closeHref={href({ id: null })} />
-              </span>
-            </div>
-            <ChatConsole
-              key={selected.id}
-              sessionId={selected.id}
-              initialLines={lines}
-              initialPaused={selected.ai_paused}
-              initialSeenAt={selected.visitor_seen_at}
-            />
-          </aside>
-        </div>
-      )}
-    </>
+      <ChatDrawer summaries={summaries} />
+    </DrawerProvider>
   );
 }
