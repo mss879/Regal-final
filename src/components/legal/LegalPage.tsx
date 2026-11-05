@@ -69,10 +69,14 @@ export function LegalPage({
                   Email{" "}
                   <a href={`mailto:${SITE.email}`} className="text-forest underline decoration-leaf-2 underline-offset-4 hover:text-leaf">
                     {SITE.email}
-                  </a>{" "}
-                  or call{" "}
+                  </a>
+                  , call{" "}
                   <a href={SITE.phoneHref} className="text-forest underline decoration-leaf-2 underline-offset-4 hover:text-leaf">
                     {SITE.phone}
+                  </a>{" "}
+                  or WhatsApp{" "}
+                  <a href={SITE.whatsappHref} target="_blank" rel="noreferrer" className="text-forest underline decoration-leaf-2 underline-offset-4 hover:text-leaf">
+                    {SITE.whatsapp}
                   </a>
                   .
                 </p>

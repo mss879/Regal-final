@@ -80,11 +80,4 @@ export const ADMIN_FEATURES: AdminFeature[] = [
       { value: s.chats_with_enquiry ?? 0, label: "leads (30 days)" },
     ],
   },
-  {
-    key: "whatsapp",
-    href: "/admin/whatsapp",
-    label: "WhatsApp chat",
-    description: "Customer messages on the business WhatsApp number, with replies from here.",
-    icon: "chat",
-  },
 ];

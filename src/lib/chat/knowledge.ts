@@ -74,7 +74,7 @@ ${AMENITIES.map((a) => `- ${a.title}: ${a.detail}`).join("\n")}
 - Architect: ${TEAM.architect.name} (${TEAM.architect.place}), led by Madhura Prematilleke. ${TEAM.architect.body}
 
 ## Contact
-- Phone: ${SITE.phone} · Email: ${SITE.email}
+- Phone: ${SITE.phone} · WhatsApp: ${SITE.whatsapp} (${SITE.whatsappHref}) · Email: ${SITE.email}
 - Enquiry form and site-visit requests: [/contact](/contact)
 ${social.length ? `- Social: ${social.map((s) => `${s.label} ${s.href}`).join(", ")}` : ""}
 

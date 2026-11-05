@@ -1,7 +1,7 @@
 // Conversation messages for the admin drawers, fetched from /admin/api/<kind>/<id>. The last
 // copy of each conversation is kept in memory so reopening one shows it instantly.
 
-export type ThreadKind = "chats" | "whatsapp";
+export type ThreadKind = "chats";
 
 const known = new Map<string, unknown>();
 const inflight = new Map<string, Promise<unknown>>();

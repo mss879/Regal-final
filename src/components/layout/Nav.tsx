@@ -172,6 +172,7 @@ export function Nav() {
         </ul>
         <div className="space-y-1 text-sm text-sage-2">
           <a href={SITE.phoneHref} className="block text-paper">{SITE.phone}</a>
+          <a href={SITE.whatsappHref} target="_blank" rel="noreferrer" className="block text-paper">WhatsApp {SITE.whatsapp}</a>
           <a href={`mailto:${SITE.email}`} className="block">{SITE.email}</a>
           <p>{SITE.address}</p>
         </div>

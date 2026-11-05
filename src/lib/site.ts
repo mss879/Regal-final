@@ -9,6 +9,8 @@ export const SITE = {
   address: "7/1/D Kosambewatta, Digana, Rajawella",
   phone: "077-373-8943",
   phoneHref: "tel:+94773738943",
+  whatsapp: "077-024-2622",
+  whatsappHref: "https://wa.me/94770242622",
   email: "info@regalpropertysl.com",
   mapsUrl: "https://www.google.com/maps/search/?api=1&query=Kosambewatta%2C+Digana%2C+Rajawella%2C+Sri+Lanka",
   disclaimer: "All artists' impressions, photos and illustrations are indicative, and presented for illustration purposes only.",

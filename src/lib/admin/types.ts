@@ -34,33 +34,6 @@ export type ChatSession = {
 /** user = visitor, assistant = the AI, agent = staff. */
 export type ChatLine = { id: number; role: "user" | "assistant" | "agent"; content: string; created_at: string };
 
-export type WhatsAppConversation = {
-  id: string;
-  /** Phone number in digits, or a business-scoped user ID if the customer hides their number. */
-  contact_id: string;
-  profile_name: string | null;
-  unread_count: number;
-  last_preview: string | null;
-  last_direction: "in" | "out" | null;
-  last_inbound_at: string | null;
-  /** The AI doesn't answer until this time (set by a staff reply or the switch). */
-  ai_paused_until: string | null;
-  enquiry_id: string | null;
-  last_message_at: string;
-  created_at: string;
-};
-
-export type WhatsAppLine = {
-  id: number;
-  direction: "in" | "out";
-  message_type: string;
-  content: string;
-  status: "received" | "sent" | "delivered" | "read" | "failed";
-  error: string | null;
-  sent_by: "staff" | "ai" | null;
-  created_at: string;
-};
-
 export type StageColor ="lime" | "sage" | "leaf" | "moss" | "forest" | "sand" | "design" | "sold";
 export type StageKind = "open" | "won" | "lost";
 export type Stage = {

@@ -13,7 +13,7 @@ import { breadcrumbs } from "@/lib/schema";
 
 export const metadata = pageMetadata({
   title: "Contact us & book a site visit",
-  description: `Enquire about a villa or book a site visit at ${SITE.name}, ${SITE.address}. Call ${SITE.phone} or email ${SITE.email}.`,
+  description: `Enquire about a villa or book a site visit at ${SITE.name}, ${SITE.address}. Call ${SITE.phone}, WhatsApp ${SITE.whatsapp} or email ${SITE.email}.`,
   path: "/contact",
 });
 
@@ -24,6 +24,7 @@ export default function ContactPage() {
   const details = [
     { label: "Visit", value: SITE.address, href: SITE.mapsUrl, external: true },
     { label: "Call", value: SITE.phone, href: SITE.phoneHref },
+    { label: "WhatsApp", value: SITE.whatsapp, href: SITE.whatsappHref, external: true },
     { label: "Email", value: SITE.email, href: `mailto:${SITE.email}` },
   ];
 

@@ -41,6 +41,7 @@ export function CtaBand({
             <div className="mt-8 flex flex-wrap gap-3">
               <ButtonLink href={href} variant="light">Make an enquiry</ButtonLink>
               <ButtonLink href={SITE.phoneHref} variant="outline-light" arrow={false}>Call {SITE.phone}</ButtonLink>
+              <ButtonLink href={SITE.whatsappHref} variant="outline-light" arrow={false}>WhatsApp {SITE.whatsapp}</ButtonLink>
             </div>
           </Reveal>
         </div>

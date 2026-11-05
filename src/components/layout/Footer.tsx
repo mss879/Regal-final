@@ -81,6 +81,11 @@ export function Footer() {
                 <address className="mt-5 space-y-2.5 text-[0.95rem] not-italic">
                   <p>{SITE.address}</p>
                   <p><a href={SITE.phoneHref} className="transition-colors hover:text-lime">{SITE.phone}</a></p>
+                  <p>
+                    <a href={SITE.whatsappHref} target="_blank" rel="noreferrer" className="transition-colors hover:text-lime">
+                      WhatsApp {SITE.whatsapp}
+                    </a>
+                  </p>
                   {/* Phones wrap the address after the @ rather than mid-domain */}
                   <p>
                     <a href={`mailto:${SITE.email}`} className="break-words transition-colors hover:text-lime md:break-all">
